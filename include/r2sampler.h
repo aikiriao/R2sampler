@@ -12,7 +12,8 @@
 
 /* （ローパス）フィルタタイプ */
 typedef enum R2samplerFilterType {
-    R2SAMPLER_FILTERTYPE_NONE = 0 /* フィルタを適用しない */
+    R2SAMPLER_FILTERTYPE_NONE = 0,      /* フィルタを適用しない */
+    R2SAMPLER_FILTERTYPE_0ORDER_HOLD    /* 0次ホールド */
 } R2samplerFilterType;
 
 /* レート変換器生成コンフィグ */

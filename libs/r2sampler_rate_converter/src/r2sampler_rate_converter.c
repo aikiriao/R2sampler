@@ -17,6 +17,7 @@ struct R2samplerRateConverter {
     uint32_t down_rate;
     struct RingBuffer *ring_buffer;
     float *interp_buffer;
+    R2samplerFilterType filter_type;
     float *filter_coef;
     uint32_t filter_order;
     uint8_t alloc_by_own;
@@ -133,6 +134,7 @@ struct R2samplerRateConverter *R2samplerRateConverter_Create(
 
     /* メンバ設定 */
     converter->max_num_input_samples = config->max_num_input_samples;
+    converter->filter_type = config->filter_type;
     converter->alloc_by_own = tmp_alloc_by_own;
     converter->work = work;
 
@@ -268,11 +270,31 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Process(
         return R2SAMPLERRATECONVERTER_APIRESULT_INSUFFICIENT_BUFFER;
     }
 
-    /* ゼロ値挿入しつつバッファに挿入 */
+    /* ゼロ値挿入 */
     for (smpl = 0; smpl < num_input_samples; smpl++) {
         converter->interp_buffer[smpl * converter->up_rate] = input[smpl];
     }
-    /* TODO: フィルタ適用が必要 */
+
+    /* フィルタ適用 */
+    switch (converter->filter_type) {
+    case R2SAMPLER_FILTERTYPE_NONE:
+        /* 何もしない */
+        break;
+    case R2SAMPLER_FILTERTYPE_0ORDER_HOLD:
+        /* 0次ホールド */
+        {
+            uint32_t j;
+            for (smpl = 0; smpl < num_input_samples; smpl++) {
+                for (j = 1; j < converter->up_rate; j++) {
+                    converter->interp_buffer[j + smpl * converter->up_rate] = input[smpl];
+                }
+            }
+        }
+        break;
+    default:
+        assert(0);
+    }
+
     /* データ挿入 */
     rbf_ret = RingBuffer_Put(converter->ring_buffer,
             converter->interp_buffer, sizeof(float) * converter->up_rate * num_input_samples);
