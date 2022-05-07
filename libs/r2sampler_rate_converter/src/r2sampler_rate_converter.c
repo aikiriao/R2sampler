@@ -4,22 +4,32 @@
 #include <assert.h>
 
 #include "ring_buffer.h"
+#include "r2sampler_lpf.h"
 
 /* メモリアラインメント */
 #define R2SAMPLERRATECONVERTER_ALIGNMENT 16
+/* 最大値の選択 */
+#define R2SAMPLERRATECONVERTER_MAX(a, b) (((a) > (b)) ? (a) : (b))
 /* nの倍数に切り上げ */
 #define R2SAMPLERRATECONVERTER_ROUNDUP(val, n) ((((val) + ((n) - 1)) / (n)) * (n))
+
+/* FIRフィルタ */
+struct R2samplerFIRFilter {
+    uint32_t order;
+    float *coef;
+    float *history;
+    int32_t pos;
+};
 
 /* レート変換器ハンドル */
 struct R2samplerRateConverter {
     uint32_t max_num_input_samples;
     uint32_t up_rate;
     uint32_t down_rate;
-    struct RingBuffer *ring_buffer;
+    struct RingBuffer *output_buffer;
     float *interp_buffer;
     R2samplerFilterType filter_type;
-    float *filter_coef;
-    uint32_t filter_order;
+    struct R2samplerFIRFilter filter;
     uint8_t alloc_by_own;
     void *work;
 };
@@ -38,6 +48,37 @@ static uint32_t R2samplerRateConverter_GCD(uint32_t x, uint32_t y)
     return x;
 }
 
+/* 素朴な直線畳み込み(in-place) */
+static void R2samplerFIRFilter_Convolve(
+        struct R2samplerFIRFilter *filter, float *buffer, uint32_t num_samples)
+{
+	uint32_t smpl, i, buf_pos;
+
+    assert((filter != NULL) && (buffer != NULL));
+
+    for (smpl = 0; smpl < num_samples; smpl++) {
+        /* バッファに入力 */
+        filter->history[filter->pos] = buffer[smpl];
+
+		/* 1サンプル当たりの出力計算 */
+		buffer[smpl] = 0.0f;
+		buf_pos = (uint32_t)filter->pos;
+		for (i = 0; i < filter->order; i++) {
+			buffer[smpl] += filter->coef[i] * filter->history[buf_pos];
+			buf_pos++;
+			if (buf_pos >= filter->order) {
+				buf_pos = 0;
+			}
+		}
+
+		/* バッファ参照位置更新 */
+		filter->pos--;
+		if (filter->pos < 0) {
+			filter->pos = (int32_t)(filter->order - 1);
+		}
+    }
+}
+
 /* レート変換器作成に必要なワークサイズ計算 */
 int32_t R2samplerRateConverter_CalculateWorkSize(const struct R2samplerRateConverterConfig *config)
 {
@@ -52,6 +93,11 @@ int32_t R2samplerRateConverter_CalculateWorkSize(const struct R2samplerRateConve
     /* コンフィグチェック */
     if ((config->max_num_input_samples == 0)
             || (config->input_rate == 0) || (config->output_rate == 0)) {
+        return -1;
+    }
+
+    /* フィルタ次数は0か奇数を要求 */
+    if ((config->filter_order != 0) && ((config->filter_order % 2) == 0)) {
         return -1;
     }
 
@@ -86,8 +132,8 @@ int32_t R2samplerRateConverter_CalculateWorkSize(const struct R2samplerRateConve
         work_size += tmp_work_size;
     }
 
-    /* フィルタワークサイズ計算 */
-    work_size += sizeof(float) * config->filter_order + R2SAMPLERRATECONVERTER_ALIGNMENT;
+    /* フィルタワークサイズ計算（係数+入力履歴） */
+    work_size += 2 * (sizeof(float) * config->filter_order + R2SAMPLERRATECONVERTER_ALIGNMENT);
     /* 補間データバッファサイズ計算 */
     work_size += sizeof(float) * config->max_num_input_samples * tmp_up_rate + R2SAMPLERRATECONVERTER_ALIGNMENT;
 
@@ -121,6 +167,11 @@ struct R2samplerRateConverter *R2samplerRateConverter_Create(
     /* コンフィグチェック */
     if ((config->max_num_input_samples == 0)
             || (config->input_rate == 0) || (config->output_rate == 0)) {
+        return NULL;
+    }
+
+    /* フィルタ次数は0か奇数を要求 */
+    if ((config->filter_order != 0) && ((config->filter_order % 2) == 0)) {
         return NULL;
     }
 
@@ -163,8 +214,8 @@ struct R2samplerRateConverter *R2samplerRateConverter_Create(
         if ((tmp_work_size = RingBuffer_CalculateWorkSize(&buffer_config)) < 0) {
             return NULL;
         }
-        converter->ring_buffer = RingBuffer_Create(&buffer_config, work_ptr, tmp_work_size);
-        assert(converter->ring_buffer != NULL);
+        converter->output_buffer = RingBuffer_Create(&buffer_config, work_ptr, tmp_work_size);
+        assert(converter->output_buffer != NULL);
         work_ptr += tmp_work_size;
 
         /* 正規化した入出力レートを記録 */
@@ -174,9 +225,12 @@ struct R2samplerRateConverter *R2samplerRateConverter_Create(
 
     /* フィルタの領域確保 */
     work_ptr = (uint8_t *)R2SAMPLERRATECONVERTER_ROUNDUP((uintptr_t)work_ptr, R2SAMPLERRATECONVERTER_ALIGNMENT);
-    converter->filter_coef = (float *)work_ptr;
+    converter->filter.coef = (float *)work_ptr;
     work_ptr += sizeof(float) * config->filter_order;
-    converter->filter_order = config->filter_order;
+    work_ptr = (uint8_t *)R2SAMPLERRATECONVERTER_ROUNDUP((uintptr_t)work_ptr, R2SAMPLERRATECONVERTER_ALIGNMENT);
+    converter->filter.history = (float *)work_ptr;
+    work_ptr += sizeof(float) * config->filter_order;
+    converter->filter.order = config->filter_order;
 
     /* 補間データバッファの領域確保 */
     work_ptr = (uint8_t *)R2SAMPLERRATECONVERTER_ROUNDUP((uintptr_t)work_ptr, R2SAMPLERRATECONVERTER_ALIGNMENT);
@@ -185,6 +239,28 @@ struct R2samplerRateConverter *R2samplerRateConverter_Create(
 
     /* バッファオーバーランチェック */
     assert((work_ptr - (uint8_t *)work) <= work_size);
+
+    /* 必要であればフィルタ設計 */
+    switch (converter->filter_type) {
+    case R2SAMPLER_FILTERTYPE_NONE:
+    case R2SAMPLER_FILTERTYPE_0ORDER_HOLD:
+        break;
+    case R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW:
+        {
+            uint32_t i;
+            /* 阻止域の厳しい方に設定 */
+            const float cutoff = 0.5f / R2SAMPLERRATECONVERTER_MAX(converter->up_rate, converter->down_rate);
+            R2samplerLPF_CreateLPFByWindowFunction(cutoff,
+                    R2SAMPLERLPF_WINDOW_TYPE_HANN, converter->filter.coef, converter->filter.order);
+            /* 利得調整 */
+            for (i = 0; i < converter->filter.order; i++) {
+                converter->filter.coef[i] *= converter->up_rate;
+            }
+        }
+        break;
+    default:
+        assert(0);
+    }
 
     /* 作成直後にレート変換を行えるように開始を指示 */
     (void)R2samplerRateConverter_Start(converter);
@@ -197,7 +273,7 @@ void R2samplerRateConverter_Destroy(struct R2samplerRateConverter *converter)
 {
     if (converter != NULL) {
         /* 先にバッファを破棄しておく */
-        RingBuffer_Destroy(converter->ring_buffer);
+        RingBuffer_Destroy(converter->output_buffer);
         if (converter->alloc_by_own == 1) {
             free(converter->work);
         }
@@ -215,12 +291,18 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Start(struct R2samplerRat
     }
 
     /* リングバッファクリア */
-    RingBuffer_Clear(converter->ring_buffer);
+    RingBuffer_Clear(converter->output_buffer);
 
     /* 補間バッファをゼロ埋め */
     for (i = 0; i < converter->up_rate * converter->max_num_input_samples; i++) {
         converter->interp_buffer[i] = 0.0f;
     }
+
+    /* フィルタ履歴をゼロ埋め */
+    for (i = 0; i < converter->filter.order; i++) {
+        converter->filter.history[i] = 0.0f;
+    }
+    converter->filter.pos = 0;
 
     return R2SAMPLERRATECONVERTER_APIRESULT_OK;
 }
@@ -235,7 +317,7 @@ static uint32_t R2samplerRateConverter_GetNumOutputSamples(
     assert(converter != NULL);
 
     /* リングバッファ内と入力の補間後サンプル数を合算 */
-    nsmpls = (uint32_t)RingBuffer_GetRemainSize(converter->ring_buffer) / sizeof(float);
+    nsmpls = (uint32_t)RingBuffer_GetRemainSize(converter->output_buffer) / sizeof(float);
     nsmpls += converter->up_rate * num_input_samples;
 
     /* 間引いた数だけ出力可能 */
@@ -270,7 +352,10 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Process(
         return R2SAMPLERRATECONVERTER_APIRESULT_INSUFFICIENT_BUFFER;
     }
 
-    /* ゼロ値挿入 */
+    /* サンプル値+ゼロ値挿入 */
+    for (smpl = 0; smpl < num_input_samples * converter->up_rate; smpl++) {
+        converter->interp_buffer[smpl] = 0.0f;
+    }
     for (smpl = 0; smpl < num_input_samples; smpl++) {
         converter->interp_buffer[smpl * converter->up_rate] = input[smpl];
     }
@@ -291,19 +376,24 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Process(
             }
         }
         break;
+    case R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW:
+        /* LPF */
+        R2samplerFIRFilter_Convolve(&converter->filter,
+                converter->interp_buffer, num_input_samples * converter->up_rate);
+        break;
     default:
         assert(0);
     }
 
-    /* データ挿入 */
-    rbf_ret = RingBuffer_Put(converter->ring_buffer,
+    /* フィルタ済みのデータを挿入 */
+    rbf_ret = RingBuffer_Put(converter->output_buffer,
             converter->interp_buffer, sizeof(float) * converter->up_rate * num_input_samples);
     assert(rbf_ret == RINGBUFFER_APIRESULT_OK);
 
     /* 間引き結果を取得 */
     for (smpl = 0; smpl < tmp_num_output_samples; smpl++) {
         void *pdecim;
-        rbf_ret = RingBuffer_Get(converter->ring_buffer, &pdecim, sizeof(float) * converter->down_rate);
+        rbf_ret = RingBuffer_Get(converter->output_buffer, &pdecim, sizeof(float) * converter->down_rate);
         assert(rbf_ret == RINGBUFFER_APIRESULT_OK);
         output_buffer[smpl] = ((float *)pdecim)[0];
     }

@@ -13,7 +13,8 @@
 /* （ローパス）フィルタタイプ */
 typedef enum R2samplerFilterType {
     R2SAMPLER_FILTERTYPE_NONE = 0,      /* フィルタを適用しない */
-    R2SAMPLER_FILTERTYPE_0ORDER_HOLD    /* 0次ホールド */
+    R2SAMPLER_FILTERTYPE_0ORDER_HOLD,   /* 0次ホールド */
+    R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW /* Hann窓によるLPF */
 } R2samplerFilterType;
 
 /* レート変換器生成コンフィグ */
@@ -22,7 +23,7 @@ struct R2samplerRateConverterConfig {
     uint32_t input_rate;
     uint32_t output_rate;
     R2samplerFilterType filter_type;
-    uint32_t filter_order;
+    uint32_t filter_order; /* 0 or 奇数 */
 };
 
 /* API結果型 */

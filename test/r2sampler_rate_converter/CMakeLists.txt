@@ -6,7 +6,11 @@ set(PROJECT_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 set(TEST_NAME r2sampler_rate_converter_test)
 
 # 実行形式ファイル
-add_executable(${TEST_NAME} main.cpp)
+add_executable(${TEST_NAME}
+    r2sampler_rate_converter_test.cpp
+    r2sampler_lpf_test.cpp
+    main.cpp
+    )
 
 # インクルードディレクトリ
 include_directories(${PROJECT_ROOT_PATH}/libs/r2sampler_rate_converter/include)

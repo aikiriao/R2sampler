@@ -67,8 +67,8 @@ static int do_rate_convert(const char *input_file, const char *output_file, uint
         config.max_num_input_samples = NUM_BUFFER_SAMPLES;
         config.input_rate = inwav->format.sampling_rate;
         config.output_rate = output_rate;
-        config.filter_type = R2SAMPLER_FILTERTYPE_0ORDER_HOLD;
-        config.filter_order = 0;
+        config.filter_type = R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW;
+        config.filter_order = 51;
 
         if ((converter = R2samplerRateConverter_Create(&config, NULL, 0)) == NULL) {
             fprintf(stderr, "Failed to create converter handle. \n");
