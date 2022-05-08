@@ -46,11 +46,7 @@ jobs:
 
     - name: Build tools
       run: |
-        pushd tools/linne_codec
-        cmake -B build -DCMAKE_BUILD_TYPE=Release
-        cmake --build build --config Release
-        popd
-        pushd tools/linne_player
+        pushd tools/rsampler
         cmake -B build -DCMAKE_BUILD_TYPE=Release
         cmake --build build --config Release
         popd
