@@ -109,6 +109,11 @@ static int do_rate_convert(const char *input_file, const char *output_file, uint
             }
             in_progress += num_process_samples;
             out_progress += num_output_samples;
+
+            /* 進捗表示 */
+            printf("progress... %5.2f%% \r",
+                    ((in_progress + ch * inwav->format.num_samples) * 100.0f) / (inwav->format.num_channels * inwav->format.num_samples));
+            fflush(stdout);
         }
         assert(out_progress == outwav->format.num_samples);
     }
