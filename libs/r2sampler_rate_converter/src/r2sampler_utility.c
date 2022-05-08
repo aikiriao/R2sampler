@@ -110,6 +110,12 @@ void R2sampler_CreateLPFByWindowFunction(
         filter_coef[i] = 2.0f * cutoff * sinc(2.0f * (float)R2SAMPLER_PI * cutoff * x);
     }
 
+    /* フィルタサイズが1の場合は矩形窓に読み替えて終わり */
+    if (filter_order == 1) {
+        filter_coef[0] *= 1.0f;
+        return;
+    }
+
     /* 窓関数適用 */
     switch (window_type) {
     case R2SAMPLERLPF_WINDOW_TYPE_RECTANGULAR:
