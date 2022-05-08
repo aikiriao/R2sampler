@@ -223,7 +223,9 @@ struct R2samplerMultiStageRateConverter *R2samplerMultiStageRateConverter_Create
                 return NULL;
             }
             work_ptr += tmp_work_size;
-            tmp_max_num_input_samples /= down_factors[i];
+            /* up_rateとdown_rateが素の場合、除算による切り捨てにより
+            * 入力サンプルを受け付けられなくなる場合があるため切り上げ */
+            tmp_max_num_input_samples = (tmp_max_num_input_samples + down_factors[i] - 1) / down_factors[i];
         }
 
     }
@@ -281,7 +283,7 @@ R2samplerRateConverterApiResult R2samplerMultiStageRateConverter_Process(
         const float *input, uint32_t num_input_samples,
         float *output_buffer, uint32_t num_buffer_samples, uint32_t *num_output_samples)
 {
-    uint32_t i, num_input, num_output, max_num_buffer_samples;
+    uint32_t i, num_input, num_output;
     float *pinput, *poutput;
     R2samplerRateConverterApiResult ret;
     /* ポインタの入れ替え */
