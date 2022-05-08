@@ -11,6 +11,10 @@
 
 /* 最小値の選択 */
 #define RSAMPLER_MIN(a, b) (((a) < (b)) ? (a) : (b))
+/* 最大値の選択 */
+#define RSAMPLER_MAX(a, b) (((a) > (b)) ? (a) : (b))
+/* 範囲内にクリップ */
+#define RSAMPLER_INNER_VAL(val, min, max) RSAMPLER_MIN(max, RSAMPLER_MAX(min, val))
 
 /* コマンドライン仕様 */
 static struct CommandLineParserSpecification command_line_spec[] = {
@@ -40,7 +44,7 @@ static int do_rate_convert(const char *input_file, const char *output_file, uint
     struct WAVFile *inwav, *outwav;
     struct WAVFileFormat outformat;
     float *input_buffer, *output_buffer;
-    struct R2samplerRateConverter *converter;
+    struct R2samplerMultiStageRateConverter *converter;
 
     /* 入力wavファイルを開く */
     if ((inwav = WAV_CreateFromFile(input_file)) == NULL) {
@@ -63,14 +67,15 @@ static int do_rate_convert(const char *input_file, const char *output_file, uint
 
     /* レート変換器作成 */
     {
-        struct R2samplerRateConverterConfig config;
-        config.max_num_input_samples = NUM_BUFFER_SAMPLES;
-        config.input_rate = inwav->format.sampling_rate;
-        config.output_rate = output_rate;
-        config.filter_type = R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW;
-        config.filter_order = 51;
+        struct R2samplerMultiStageRateConverterConfig config;
+        config.single.max_num_input_samples = NUM_BUFFER_SAMPLES;
+        config.single.input_rate = inwav->format.sampling_rate;
+        config.single.output_rate = output_rate;
+        config.single.filter_type = R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW;
+        config.single.filter_order = 101;
+        config.max_num_stages = 6;
 
-        if ((converter = R2samplerRateConverter_Create(&config, NULL, 0)) == NULL) {
+        if ((converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0)) == NULL) {
             fprintf(stderr, "Failed to create converter handle. \n");
             return 1;
         }
@@ -80,6 +85,7 @@ static int do_rate_convert(const char *input_file, const char *output_file, uint
     for (ch = 0; ch < inwav->format.num_channels; ch++) {
         uint32_t in_progress, out_progress;
         in_progress = out_progress = 0;
+        R2samplerMultiStageRateConverter_Start(converter);
         while (in_progress < inwav->format.num_samples) {
             uint32_t smpl, num_process_samples, num_output_samples;
             R2samplerRateConverterApiResult ret;
@@ -87,11 +93,10 @@ static int do_rate_convert(const char *input_file, const char *output_file, uint
             num_process_samples = RSAMPLER_MIN(NUM_BUFFER_SAMPLES, inwav->format.num_samples - in_progress);
             /* floatに変換 */
             for (smpl = 0; smpl < num_process_samples; smpl++) {
-                input_buffer[smpl]
-                    = (float)WAVFile_PCM(inwav, in_progress + smpl, ch) * powf(2.0f, -(int32_t)(inwav->format.bits_per_sample - 1));
+                input_buffer[smpl] = (float)WAVFile_PCM(inwav, in_progress + smpl, ch) * powf(2.0f, -31);
             }
             /* レート変換処理 */
-            if ((ret = R2samplerRateConverter_Process(converter,
+            if ((ret = R2samplerMultiStageRateConverter_Process(converter,
                     input_buffer, num_process_samples,
                     output_buffer, num_output_buffer_samples, &num_output_samples)) != R2SAMPLERRATECONVERTER_APIRESULT_OK) {
                 fprintf(stderr, "Failed to process rate conversion. (api ret:%d) \n", ret);
@@ -99,8 +104,8 @@ static int do_rate_convert(const char *input_file, const char *output_file, uint
             }
             /* 結果を整数に丸め込み */
             for (smpl = 0; smpl < num_output_samples; smpl++) {
-                WAVFile_PCM(outwav, out_progress + smpl, ch)
-                        = (int32_t)myroundf(output_buffer[smpl] * powf(2.0f, inwav->format.bits_per_sample - 1));
+                const int64_t pcm = (int64_t)myroundf(output_buffer[smpl] * powf(2.0f, 31));
+                WAVFile_PCM(outwav, out_progress + smpl, ch) = (int32_t)RSAMPLER_INNER_VAL(pcm, INT32_MIN, INT32_MAX); 
             }
             in_progress += num_process_samples;
             out_progress += num_output_samples;
@@ -115,7 +120,7 @@ static int do_rate_convert(const char *input_file, const char *output_file, uint
     }
 
     /* リソース破棄 */
-    R2samplerRateConverter_Destroy(converter);
+    R2samplerMultiStageRateConverter_Destroy(converter);
     free(output_buffer);
     free(input_buffer);
     WAV_Destroy(outwav);
