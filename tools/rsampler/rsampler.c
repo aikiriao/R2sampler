@@ -39,7 +39,7 @@ static float myroundf(float f)
 /* レート変換実行 */
 static int do_rate_convert(const char *input_file, const char *output_file, uint32_t output_rate)
 {
-#define NUM_BUFFER_SAMPLES 256
+#define NUM_BUFFER_SAMPLES 64
     uint32_t ch, num_output_buffer_samples;
     struct WAVFile *inwav, *outwav;
     struct WAVFileFormat outformat;
