@@ -197,7 +197,17 @@ int main(int argc, char** argv)
         fprintf(stderr, "%s: output-rate must be specified. \n", argv[0]);
         return 1;
     }
-    output_rate = (uint32_t)strtol(CommandLineParser_GetArgumentString(command_line_spec, "output-rate"), NULL, 10);
+
+    /* 出力レート文字列のパース */
+    {
+        char *e;
+        const char *lstr = CommandLineParser_GetArgumentString(command_line_spec, "output-rate");
+        output_rate = (uint32_t)strtol(lstr, &e, 10);
+        if (*e != '\0'){
+            fprintf(stderr, "%s: irregular character found in %s at %s\n", argv[0], lstr, e);
+            return 1;
+        }
+    }
 
     /* レート変換実行 */
     if (do_rate_convert(input_file, output_file, output_rate) != 0) {
