@@ -39,7 +39,7 @@ struct R2samplerRateConverter {
 static void R2samplerFIRFilter_Convolve(
         struct R2samplerFIRFilter *filter, float *buffer, uint32_t num_samples)
 {
-	uint32_t smpl, i, buf_pos;
+    uint32_t smpl, i, buf_pos;
 
     assert((filter != NULL) && (buffer != NULL));
 
@@ -47,22 +47,22 @@ static void R2samplerFIRFilter_Convolve(
         /* バッファに入力 */
         filter->history[filter->pos] = buffer[smpl];
 
-		/* 1サンプル当たりの出力計算 */
-		buffer[smpl] = 0.0f;
-		buf_pos = (uint32_t)filter->pos;
-		for (i = 0; i < filter->order; i++) {
-			buffer[smpl] += filter->coef[i] * filter->history[buf_pos];
-			buf_pos++;
-			if (buf_pos >= filter->order) {
-				buf_pos = 0;
-			}
-		}
+        /* 1サンプル当たりの出力計算 */
+        buffer[smpl] = 0.0f;
+        buf_pos = (uint32_t)filter->pos;
+        for (i = 0; i < filter->order; i++) {
+            buffer[smpl] += filter->coef[i] * filter->history[buf_pos];
+            buf_pos++;
+            if (buf_pos >= filter->order) {
+                buf_pos = 0;
+            }
+        }
 
-		/* バッファ参照位置更新 */
-		filter->pos--;
-		if (filter->pos < 0) {
-			filter->pos = (int32_t)(filter->order - 1);
-		}
+        /* バッファ参照位置更新 */
+        filter->pos--;
+        if (filter->pos < 0) {
+            filter->pos = (int32_t)(filter->order - 1);
+        }
     }
 }
 

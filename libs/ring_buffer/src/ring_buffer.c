@@ -29,7 +29,7 @@ int32_t RingBuffer_CalculateWorkSize(const struct RingBufferConfig *config)
     if (config == NULL) {
         return -1;
     }
-    
+
     /* バッファサイズは要求サイズより大きい */
     if (config->max_size < config->max_required_size) {
         return -1;

@@ -182,7 +182,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
             struct R2samplerRateConverterConfig config;
 
             output = (float *)malloc(sizeof(float) * num_buffer_samples);
-            
+
             config.max_num_input_samples = NUMINPUTS;
             config.input_rate = 1;
             config.output_rate = rate;
@@ -261,7 +261,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
 
             EXPECT_EQ(converter->up_rate, 1);
             EXPECT_EQ(converter->down_rate, rate);
- 
+
             for (smpl = 0; smpl < MAXRATE * NUMSAMPLES; smpl++) {
                 input[smpl] = 0.0f;
             }

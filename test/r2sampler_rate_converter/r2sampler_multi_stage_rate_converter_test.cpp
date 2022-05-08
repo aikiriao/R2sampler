@@ -199,7 +199,7 @@ TEST(R2samplerMultiStageRateConverterTest, RateConvertTest)
             struct R2samplerMultiStageRateConverterConfig config;
 
             output = (float *)malloc(sizeof(float) * num_buffer_samples);
-            
+
             config.single.max_num_input_samples = NUMINPUTS;
             config.single.input_rate = 1;
             config.single.output_rate = rate;

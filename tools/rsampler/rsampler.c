@@ -105,7 +105,7 @@ static int do_rate_convert(const char *input_file, const char *output_file, uint
             /* 結果を整数に丸め込み */
             for (smpl = 0; smpl < num_output_samples; smpl++) {
                 const int64_t pcm = (int64_t)myroundf(output_buffer[smpl] * powf(2.0f, 31));
-                WAVFile_PCM(outwav, out_progress + smpl, ch) = (int32_t)RSAMPLER_INNER_VAL(pcm, INT32_MIN, INT32_MAX); 
+                WAVFile_PCM(outwav, out_progress + smpl, ch) = (int32_t)RSAMPLER_INNER_VAL(pcm, INT32_MIN, INT32_MAX);
             }
             in_progress += num_process_samples;
             out_progress += num_output_samples;

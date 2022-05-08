@@ -22,7 +22,7 @@ typedef struct FFTComplex {
 static void FFT_ComplexFFT(int n, int flag, FFTComplex *x, FFTComplex *y);
 
 /* 複素数型のサイズチェック floatの配列を複素数型とみなして計算するため
-* 構造体にパディングなどが入ってしまうとサイズが合わなくなる 
+* 構造体にパディングなどが入ってしまうとサイズが合わなくなる
 * 合わない場合は#pragmaで構造体をパックする */
 extern char FFT_checksize[(sizeof(FFTComplex) == (sizeof(float) * 2)) ? 1 : -1];
 
