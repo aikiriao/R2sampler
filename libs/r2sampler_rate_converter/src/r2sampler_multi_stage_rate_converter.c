@@ -24,6 +24,7 @@ struct R2samplerMultiStageRateConverter {
     uint32_t num_down_stages;
     uint32_t max_num_input_samples;
     float *process_buffer[2];
+    uint32_t max_num_buffer_samples;
     uint8_t alloc_by_own;
     void *work;
 };
@@ -163,6 +164,7 @@ struct R2samplerMultiStageRateConverter *R2samplerMultiStageRateConverter_Create
     /* 入出力レートを記録 */
     converter->up_rate = tmp_up_rate;
     converter->down_rate = tmp_down_rate;
+    converter->max_num_buffer_samples = tmp_up_rate * config->single.max_num_input_samples;
 
     /* 入出力レートを素因数分解し、因数で分割したレート変換器のサイズを計算 */
     up_factors = (uint32_t *)alloca(sizeof(uint32_t) * config->max_num_stages);
@@ -273,32 +275,16 @@ R2samplerRateConverterApiResult R2samplerMultiStageRateConverter_Start(struct R2
     return R2SAMPLERRATECONVERTER_APIRESULT_OK;
 }
 
-/* 入力サンプル数に対して得られる出力サンプル数を取得 */
-static uint32_t R2samplerMultiStageRateConverter_GetNumOutputSamples(
-        const struct R2samplerMultiStageRateConverter *converter, uint32_t num_input_samples)
-{
-    uint32_t nsmpls;
-
-    /* 引数チェック */
-    assert(converter != NULL);
-
-    /* 最終ステージ（補間完了後）がバッファリングしているサンプル数と補間後サンプル数を合算 */
-    nsmpls = R2samplerRateConverter_GetNumBufferedSamples(converter->up_sampler[converter->num_up_stages - 1]);
-    nsmpls += converter->up_rate * num_input_samples;
-
-    /* 間引いた数だけ出力可能 */
-    return nsmpls / converter->down_rate;
-}
-
 /* レート変換 */
 R2samplerRateConverterApiResult R2samplerMultiStageRateConverter_Process(
         struct R2samplerMultiStageRateConverter *converter,
         const float *input, uint32_t num_input_samples,
         float *output_buffer, uint32_t num_buffer_samples, uint32_t *num_output_samples)
 {
-    uint32_t i, num_input, num_output, tmp_num_output_samples, max_num_buffer_samples;
+    uint32_t i, num_input, num_output, max_num_buffer_samples;
     float *pinput, *poutput;
     R2samplerRateConverterApiResult ret;
+    /* ポインタの入れ替え */
 #define SWAP_POINTER(p1, p2) \
     do {\
         float* tmp__;\
@@ -316,19 +302,10 @@ R2samplerRateConverterApiResult R2samplerMultiStageRateConverter_Process(
         return R2SAMPLERRATECONVERTER_APIRESULT_TOOMANY_NUM_INPUTS;
     }
 
-    /* 出力サンプル数の計算 */
-    tmp_num_output_samples = R2samplerMultiStageRateConverter_GetNumOutputSamples(converter, num_input_samples);
-
-    /* バッファサイズ不足 */
-    if (tmp_num_output_samples > num_buffer_samples) {
-        return R2SAMPLERRATECONVERTER_APIRESULT_INSUFFICIENT_BUFFER;
-    }
-
     /* 処理ポインタをセット */
     pinput = converter->process_buffer[0];
     poutput = converter->process_buffer[1];
     num_input = num_input_samples;
-    max_num_buffer_samples = converter->up_rate * converter->max_num_input_samples;
 
     /* 入力データをセット */
     memcpy(pinput, input, sizeof(float) * num_input_samples);
@@ -336,20 +313,27 @@ R2samplerRateConverterApiResult R2samplerMultiStageRateConverter_Process(
     /* アップサンプル */
     for (i = 0; i < converter->num_up_stages; i++) {
         if ((ret = R2samplerRateConverter_Process(converter->up_sampler[i],
-                        pinput, num_input, poutput, max_num_buffer_samples, &num_output)) != R2SAMPLERRATECONVERTER_APIRESULT_OK) {
+                        pinput, num_input, poutput,
+                        converter->max_num_buffer_samples, &num_output)) != R2SAMPLERRATECONVERTER_APIRESULT_OK) {
             return ret;
         }
         /* 出力を次の入力に差し替え */
         SWAP_POINTER(pinput, poutput);
         num_input = num_output;
     }
-    assert(num_output == converter->up_rate * num_input_samples);
+    assert(num_output == (converter->up_rate * num_input_samples));
 
     /* ダウンサンプル */
     for (i = 0; i < converter->num_down_stages; i++) {
         if ((ret = R2samplerRateConverter_Process(converter->down_sampler[i],
-                        pinput, num_input, poutput, max_num_buffer_samples, &num_output)) != R2SAMPLERRATECONVERTER_APIRESULT_OK) {
+                        pinput, num_input, poutput,
+                        converter->max_num_buffer_samples, &num_output)) != R2SAMPLERRATECONVERTER_APIRESULT_OK) {
             return ret;
+        }
+        /* ダウンサンプルの途中で出力がなくなった場合はそこで中断 */
+        if (num_output == 0) {
+            (*num_output_samples) = 0;
+            return R2SAMPLERRATECONVERTER_APIRESULT_OK;
         }
         /* 出力を次の入力に差し替え */
         SWAP_POINTER(pinput, poutput);
@@ -357,11 +341,10 @@ R2samplerRateConverterApiResult R2samplerMultiStageRateConverter_Process(
     }
 
     /* 出力データを取得（最後にスワップが入るので入力ポインタが最終結果を指している） */
-    assert(tmp_num_output_samples == num_output);
-    memcpy(output_buffer, pinput, sizeof(float) * tmp_num_output_samples);
+    memcpy(output_buffer, pinput, sizeof(float) * num_output);
 
     /* 出力サンプル数をセット */
-    (*num_output_samples) = tmp_num_output_samples;
+    (*num_output_samples) = num_output;
 
     return R2SAMPLERRATECONVERTER_APIRESULT_OK;
 }
