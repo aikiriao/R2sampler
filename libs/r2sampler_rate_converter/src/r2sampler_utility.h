@@ -5,8 +5,10 @@
 
 /* 窓関数タイプ */
 typedef enum R2samplerLPFWindowType {
-    R2SAMPLERLPF_WINDOW_TYPE_RECTANGULAR = 0, /* 矩形窓 */
-    R2SAMPLERLPF_WINDOW_TYPE_HANN /* ハン窓 */
+    R2SAMPLERLPF_WINDOW_TYPE_RECTANGULAR = 0,   /* 矩形窓 */
+    R2SAMPLERLPF_WINDOW_TYPE_HANN,              /* ハン窓 */
+    R2SAMPLERLPF_WINDOW_TYPE_BLACKMAN,          /* Blackman窓 */
+    R2SAMPLERLPF_WINDOW_TYPE_INVALID            /* 無効値 */
 } R2samplerLPFWindowType;
 
 #ifdef __cplusplus

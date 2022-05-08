@@ -71,7 +71,7 @@ static int do_rate_convert(const char *input_file, const char *output_file, uint
         config.single.max_num_input_samples = NUM_BUFFER_SAMPLES;
         config.single.input_rate = inwav->format.sampling_rate;
         config.single.output_rate = output_rate;
-        config.single.filter_type = R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW;
+        config.single.filter_type = R2SAMPLER_FILTERTYPE_LPF_BLACKMANWINDOW;
         config.single.filter_order = 101;
         config.max_num_stages = 6;
 

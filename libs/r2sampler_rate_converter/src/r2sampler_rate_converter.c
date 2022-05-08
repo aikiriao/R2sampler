@@ -233,12 +233,27 @@ struct R2samplerRateConverter *R2samplerRateConverter_Create(
     case R2SAMPLER_FILTERTYPE_0ORDER_HOLD:
         break;
     case R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW:
+    case R2SAMPLER_FILTERTYPE_LPF_BLACKMANWINDOW:
         {
             uint32_t i;
-            /* 阻止域の厳しい方に設定 */
+            R2samplerLPFWindowType window_type = R2SAMPLERLPF_WINDOW_TYPE_INVALID;
+            /* 阻止域: エイリアシング防止のため狭い方に設定 */
             const float cutoff = 0.5f / R2SAMPLERRATECONVERTER_MAX(converter->up_rate, converter->down_rate);
+            /* フィルタ設計 */
+            switch (converter->filter_type) {
+            case R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW:
+                window_type = R2SAMPLERLPF_WINDOW_TYPE_HANN;
+                break;
+            case R2SAMPLER_FILTERTYPE_LPF_BLACKMANWINDOW:
+                window_type = R2SAMPLERLPF_WINDOW_TYPE_BLACKMAN;
+                break;
+            case R2SAMPLER_FILTERTYPE_NONE:
+            case R2SAMPLER_FILTERTYPE_0ORDER_HOLD:
+                assert(0);
+            }
+            assert(window_type != R2SAMPLERLPF_WINDOW_TYPE_INVALID);
             R2sampler_CreateLPFByWindowFunction(cutoff,
-                    R2SAMPLERLPF_WINDOW_TYPE_HANN, converter->filter.coef, converter->filter.order);
+                    window_type, converter->filter.coef, converter->filter.order);
             /* 利得調整 */
             for (i = 0; i < converter->filter.order; i++) {
                 converter->filter.coef[i] *= converter->up_rate;
@@ -373,6 +388,7 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Process(
         }
         break;
     case R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW:
+    case R2SAMPLER_FILTERTYPE_LPF_BLACKMANWINDOW:
         /* LPF */
         R2samplerFIRFilter_Convolve(&converter->filter,
                 converter->interp_buffer, num_input_samples * converter->up_rate);

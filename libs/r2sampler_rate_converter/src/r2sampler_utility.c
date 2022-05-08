@@ -19,6 +19,12 @@ static float hanning_window(float x)
     return 0.5f - 0.5f * cosf(2.0f * (float)R2SAMPLER_PI * x);
 }
 
+/* Blackman窓 0 <= x <= 1 */
+static float blackman_window(float x)
+{
+    return 0.42f - 0.5f * cosf(2.0f * (float)R2SAMPLER_PI * x) + 0.08f * cosf(4.0f * (float)R2SAMPLER_PI * x);
+}
+
 /* xとyの最大公約数を求める */
 uint32_t R2sampler_GCD(uint32_t x, uint32_t y)
 {
@@ -113,6 +119,12 @@ void R2sampler_CreateLPFByWindowFunction(
         /* ハン窓 */
         for (i = 0; i < filter_order; i++) {
             filter_coef[i] *= hanning_window(i / (filter_order - 1.0f));
+        }
+        break;
+    case R2SAMPLERLPF_WINDOW_TYPE_BLACKMAN:
+        /* Blackman窓 */
+        for (i = 0; i < filter_order; i++) {
+            filter_coef[i] *= blackman_window(i / (filter_order - 1.0f));
         }
         break;
     default:
