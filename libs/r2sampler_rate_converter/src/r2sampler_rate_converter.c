@@ -1,4 +1,5 @@
 #include <r2sampler.h>
+#include "r2sampler_rate_converter.h"
 
 #include <stdlib.h>
 #include <assert.h>
@@ -293,6 +294,15 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Start(struct R2samplerRat
     return R2SAMPLERRATECONVERTER_APIRESULT_OK;
 }
 
+/* 内部でバッファリングしているサンプル数を取得 */
+uint32_t R2samplerRateConverter_GetNumBufferedSamples(const struct R2samplerRateConverter *converter)
+{
+    /* 引数チェック */
+    assert(converter != NULL);
+
+    return (uint32_t)RingBuffer_GetRemainSize(converter->output_buffer) / sizeof(float);
+}
+
 /* 入力サンプル数に対して得られる出力サンプル数を取得 */
 static uint32_t R2samplerRateConverter_GetNumOutputSamples(
         const struct R2samplerRateConverter *converter, uint32_t num_input_samples)
@@ -303,7 +313,7 @@ static uint32_t R2samplerRateConverter_GetNumOutputSamples(
     assert(converter != NULL);
 
     /* リングバッファ内と入力の補間後サンプル数を合算 */
-    nsmpls = (uint32_t)RingBuffer_GetRemainSize(converter->output_buffer) / sizeof(float);
+    nsmpls = R2samplerRateConverter_GetNumBufferedSamples(converter);
     nsmpls += converter->up_rate * num_input_samples;
 
     /* 間引いた数だけ出力可能 */

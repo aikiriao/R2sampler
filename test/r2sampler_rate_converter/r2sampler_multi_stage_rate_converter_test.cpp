@@ -5,171 +5,188 @@
 
 /* テスト対象のモジュール */
 extern "C" {
-#include "../../libs/r2sampler_rate_converter/src/r2sampler_rate_converter.c"
+#include "../../libs/r2sampler_rate_converter/src/r2sampler_multi_stage_rate_converter.c"
 }
 
 /* ハンドル作成・破棄テスト */
-TEST(R2samplerRateConverterTest, CreateDestroyHandleTest)
+TEST(R2samplerMultiStageRateConverterTest, CreateDestroyHandleTest)
 {
 /* 有効なコンフィグをセット */
-#define R2samplerRateConverter_SetValidConfig(p_config)\
+#define R2samplerMultiStageRateConverter_SetValidConfig(p_config)\
     do {\
-        struct R2samplerRateConverterConfig *config__p = p_config;\
-        config__p->max_num_input_samples        = 32;\
-        config__p->input_rate                   = 44100;\
-        config__p->output_rate                  = 48000;\
-        config__p->filter_type                  = R2SAMPLER_FILTERTYPE_NONE;\
-        config__p->filter_order                 = 3;\
+        struct R2samplerMultiStageRateConverterConfig *config__p = p_config;\
+        config__p->single.max_num_input_samples = 32;\
+        config__p->single.input_rate            = 44100;\
+        config__p->single.output_rate           = 48000;\
+        config__p->single.filter_type           = R2SAMPLER_FILTERTYPE_NONE;\
+        config__p->single.filter_order          = 3;\
+        config__p->max_num_stages               = 4;\
     } while (0);
 
     /* ワークサイズ計算テスト */
     {
         int32_t work_size;
-        struct R2samplerRateConverterConfig config;
+        struct R2samplerMultiStageRateConverterConfig config;
 
         /* 最低限構造体本体よりは大きいはず */
-        R2samplerRateConverter_SetValidConfig(&config);
-        work_size = R2samplerRateConverter_CalculateWorkSize(&config);
-        ASSERT_TRUE(work_size > sizeof(struct R2samplerRateConverter));
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        work_size = R2samplerMultiStageRateConverter_CalculateWorkSize(&config);
+        ASSERT_TRUE(work_size > sizeof(struct R2samplerMultiStageRateConverter));
 
         /* 不正な引数 */
-        EXPECT_TRUE(R2samplerRateConverter_CalculateWorkSize(NULL) < 0);
+        EXPECT_TRUE(R2samplerMultiStageRateConverter_CalculateWorkSize(NULL) < 0);
 
         /* 不正なコンフィグ */
-        R2samplerRateConverter_SetValidConfig(&config);
-        config.max_num_input_samples = 0;
-        EXPECT_TRUE(R2samplerRateConverter_CalculateWorkSize(&config) < 0);
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.single.max_num_input_samples = 0;
+        EXPECT_TRUE(R2samplerMultiStageRateConverter_CalculateWorkSize(&config) < 0);
 
-        R2samplerRateConverter_SetValidConfig(&config);
-        config.input_rate = 0;
-        EXPECT_TRUE(R2samplerRateConverter_CalculateWorkSize(&config) < 0);
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.single.input_rate = 0;
+        EXPECT_TRUE(R2samplerMultiStageRateConverter_CalculateWorkSize(&config) < 0);
 
-        R2samplerRateConverter_SetValidConfig(&config);
-        config.output_rate = 0;
-        EXPECT_TRUE(R2samplerRateConverter_CalculateWorkSize(&config) < 0);
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.single.output_rate = 0;
+        EXPECT_TRUE(R2samplerMultiStageRateConverter_CalculateWorkSize(&config) < 0);
+
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.max_num_stages = 0;
+        EXPECT_TRUE(R2samplerMultiStageRateConverter_CalculateWorkSize(&config) < 0);
     }
 
     /* ワーク領域渡しによるハンドル作成（成功例） */
     {
         void *work;
         int32_t work_size;
-        struct R2samplerRateConverter *converter;
-        struct R2samplerRateConverterConfig config;
+        struct R2samplerMultiStageRateConverter *converter;
+        struct R2samplerMultiStageRateConverterConfig config;
 
-        R2samplerRateConverter_SetValidConfig(&config);
-        work_size = R2samplerRateConverter_CalculateWorkSize(&config);
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        work_size = R2samplerMultiStageRateConverter_CalculateWorkSize(&config);
         work = malloc(work_size);
 
-        converter = R2samplerRateConverter_Create(&config, work, work_size);
+        converter = R2samplerMultiStageRateConverter_Create(&config, work, work_size);
         ASSERT_TRUE(converter != NULL);
         EXPECT_TRUE(converter->work == work);
         EXPECT_EQ(0, converter->alloc_by_own);
-        EXPECT_TRUE(converter->output_buffer != NULL);
-        EXPECT_TRUE(converter->interp_buffer != NULL);
-        EXPECT_TRUE(converter->filter.coef != NULL);
-        EXPECT_EQ(config.filter_order, converter->filter.order);
+        EXPECT_TRUE(converter->up_sampler != NULL);
+        EXPECT_TRUE(converter->down_sampler != NULL);
+        EXPECT_TRUE(converter->process_buffer[0] != NULL);
+        EXPECT_TRUE(converter->process_buffer[1] != NULL);
+        EXPECT_EQ(config.max_num_stages, converter->max_num_stages);
 
-        R2samplerRateConverter_Destroy(converter);
+        R2samplerMultiStageRateConverter_Destroy(converter);
         free(work);
     }
 
     /* 自前確保によるハンドル作成（成功例） */
     {
-        struct R2samplerRateConverter *converter;
-        struct R2samplerRateConverterConfig config;
+        struct R2samplerMultiStageRateConverter *converter;
+        struct R2samplerMultiStageRateConverterConfig config;
 
-        R2samplerRateConverter_SetValidConfig(&config);
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
 
-        converter = R2samplerRateConverter_Create(&config, NULL, 0);
+        converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0);
         ASSERT_TRUE(converter != NULL);
         EXPECT_TRUE(converter->work != NULL);
         EXPECT_EQ(1, converter->alloc_by_own);
-        EXPECT_TRUE(converter->output_buffer != NULL);
-        EXPECT_TRUE(converter->interp_buffer != NULL);
-        EXPECT_TRUE(converter->filter.coef != NULL);
-        EXPECT_EQ(config.filter_order, converter->filter.order);
+        EXPECT_TRUE(converter->up_sampler != NULL);
+        EXPECT_TRUE(converter->down_sampler != NULL);
+        EXPECT_TRUE(converter->process_buffer[0] != NULL);
+        EXPECT_TRUE(converter->process_buffer[1] != NULL);
+        EXPECT_EQ(config.max_num_stages, converter->max_num_stages);
 
-        R2samplerRateConverter_Destroy(converter);
+        R2samplerMultiStageRateConverter_Destroy(converter);
     }
 
     /* ワーク領域渡しによるハンドル作成（失敗ケース） */
     {
         void *work;
         int32_t work_size;
-        struct R2samplerRateConverter *converter;
-        struct R2samplerRateConverterConfig config;
+        struct R2samplerMultiStageRateConverter *converter;
+        struct R2samplerMultiStageRateConverterConfig config;
 
-        R2samplerRateConverter_SetValidConfig(&config);
-        work_size = R2samplerRateConverter_CalculateWorkSize(&config);
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        work_size = R2samplerMultiStageRateConverter_CalculateWorkSize(&config);
         work = malloc(work_size);
 
         /* 引数が不正 */
-        converter = R2samplerRateConverter_Create(NULL, work, work_size);
+        converter = R2samplerMultiStageRateConverter_Create(NULL, work, work_size);
         EXPECT_TRUE(converter == NULL);
-        converter = R2samplerRateConverter_Create(&config, NULL, work_size);
+        converter = R2samplerMultiStageRateConverter_Create(&config, NULL, work_size);
         EXPECT_TRUE(converter == NULL);
-        converter = R2samplerRateConverter_Create(&config, work, 0);
+        converter = R2samplerMultiStageRateConverter_Create(&config, work, 0);
         EXPECT_TRUE(converter == NULL);
 
         /* ワークサイズ不足 */
-        converter = R2samplerRateConverter_Create(&config, work, work_size - 1);
+        converter = R2samplerMultiStageRateConverter_Create(&config, work, work_size - 1);
         EXPECT_TRUE(converter == NULL);
 
         /* コンフィグが不正 */
-        R2samplerRateConverter_SetValidConfig(&config);
-        config.max_num_input_samples = 0;
-        converter = R2samplerRateConverter_Create(&config, work, work_size);
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.single.max_num_input_samples = 0;
+        converter = R2samplerMultiStageRateConverter_Create(&config, work, work_size);
         EXPECT_TRUE(converter == NULL);
 
-        R2samplerRateConverter_SetValidConfig(&config);
-        config.input_rate = 0;
-        converter = R2samplerRateConverter_Create(&config, work, work_size);
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.single.input_rate = 0;
+        converter = R2samplerMultiStageRateConverter_Create(&config, work, work_size);
         EXPECT_TRUE(converter == NULL);
 
-        R2samplerRateConverter_SetValidConfig(&config);
-        config.output_rate = 0;
-        converter = R2samplerRateConverter_Create(&config, work, work_size);
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.single.output_rate = 0;
+        converter = R2samplerMultiStageRateConverter_Create(&config, work, work_size);
+        EXPECT_TRUE(converter == NULL);
+
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.max_num_stages = 0;
+        converter = R2samplerMultiStageRateConverter_Create(&config, work, work_size);
         EXPECT_TRUE(converter == NULL);
     }
 
     /* 自前確保によるハンドル作成（失敗ケース） */
     {
-        struct R2samplerRateConverter *converter;
-        struct R2samplerRateConverterConfig config;
+        struct R2samplerMultiStageRateConverter *converter;
+        struct R2samplerMultiStageRateConverterConfig config;
 
-        R2samplerRateConverter_SetValidConfig(&config);
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
 
         /* 引数が不正 */
-        converter = R2samplerRateConverter_Create(NULL, NULL, 0);
+        converter = R2samplerMultiStageRateConverter_Create(NULL, NULL, 0);
         EXPECT_TRUE(converter == NULL);
 
         /* コンフィグが不正 */
-        R2samplerRateConverter_SetValidConfig(&config);
-        config.max_num_input_samples = 0;
-        converter = R2samplerRateConverter_Create(&config, NULL, 0);
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.single.max_num_input_samples = 0;
+        converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0);
         EXPECT_TRUE(converter == NULL);
 
-        R2samplerRateConverter_SetValidConfig(&config);
-        config.input_rate = 0;
-        converter = R2samplerRateConverter_Create(&config, NULL, 0);
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.single.input_rate = 0;
+        converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0);
         EXPECT_TRUE(converter == NULL);
 
-        R2samplerRateConverter_SetValidConfig(&config);
-        config.output_rate = 0;
-        converter = R2samplerRateConverter_Create(&config, NULL, 0);
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.single.output_rate = 0;
+        converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0);
+        EXPECT_TRUE(converter == NULL);
+
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.max_num_stages = 0;
+        converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0);
         EXPECT_TRUE(converter == NULL);
     }
 }
 
 /* レート変換テスト */
-TEST(R2samplerRateConverterTest, RateConvertTest)
+TEST(R2samplerMultiStageRateConverterTest, RateConvertTest)
 {
     /* rate倍に補間 */
     {
 #define MAXRATE 16
 #define NUMSAMPLES 16
 #define NUMINPUTS 1
-        struct R2samplerRateConverter *converter;
+        struct R2samplerMultiStageRateConverter *converter;
         R2samplerRateConverterApiResult ret;
         float input[NUMSAMPLES];
         float *output;
@@ -179,16 +196,17 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
             const uint32_t num_buffer_samples
                 = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(NUMSAMPLES, 1, rate);
             uint32_t in_prog, out_prog, smpl;
-            struct R2samplerRateConverterConfig config;
+            struct R2samplerMultiStageRateConverterConfig config;
 
             output = (float *)malloc(sizeof(float) * num_buffer_samples);
             
-            config.max_num_input_samples = NUMINPUTS;
-            config.input_rate = 1;
-            config.output_rate = rate;
-            config.filter_type = R2SAMPLER_FILTERTYPE_NONE;
-            config.filter_order = 0;
-            converter = R2samplerRateConverter_Create(&config, NULL, 0);
+            config.single.max_num_input_samples = NUMINPUTS;
+            config.single.input_rate = 1;
+            config.single.output_rate = rate;
+            config.single.filter_type = R2SAMPLER_FILTERTYPE_NONE;
+            config.single.filter_order = 0;
+            config.max_num_stages = 2;
+            converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0);
             ASSERT_TRUE(converter != NULL);
 
             EXPECT_EQ(converter->up_rate, rate);
@@ -204,7 +222,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
             in_prog = out_prog = 0;
             while (in_prog < NUMSAMPLES) {
                 uint32_t num_outputs;
-                ret = R2samplerRateConverter_Process(converter,
+                ret = R2samplerMultiStageRateConverter_Process(converter,
                         &input[in_prog], NUMINPUTS,
                         &output[out_prog], num_buffer_samples - out_prog, &num_outputs);
                 ASSERT_EQ(R2SAMPLERRATECONVERTER_APIRESULT_OK, ret);
@@ -224,7 +242,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
                 }
             }
 
-            R2samplerRateConverter_Destroy(converter);
+            R2samplerMultiStageRateConverter_Destroy(converter);
             free(output);
         }
 #undef MAXRATE
@@ -237,7 +255,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
 #define MAXRATE 16
 #define NUMSAMPLES 16
 #define NUMINPUTS 1
-        struct R2samplerRateConverter *converter;
+        struct R2samplerMultiStageRateConverter *converter;
         R2samplerRateConverterApiResult ret;
         float input[MAXRATE * NUMSAMPLES];
         float *output;
@@ -247,21 +265,22 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
             const uint32_t num_buffer_samples
                 = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(rate * NUMSAMPLES, rate, 1);
             uint32_t in_prog, out_prog, smpl;
-            struct R2samplerRateConverterConfig config;
+            struct R2samplerMultiStageRateConverterConfig config;
 
             output = (float *)malloc(sizeof(float) * num_buffer_samples);
 
-            config.max_num_input_samples = rate * NUMINPUTS;
-            config.input_rate = rate;
-            config.output_rate = 1;
-            config.filter_type = R2SAMPLER_FILTERTYPE_NONE;
-            config.filter_order = 0;
-            converter = R2samplerRateConverter_Create(&config, NULL, 0);
+            config.single.max_num_input_samples = rate * NUMINPUTS;
+            config.single.input_rate = rate;
+            config.single.output_rate = 1;
+            config.single.filter_type = R2SAMPLER_FILTERTYPE_NONE;
+            config.single.filter_order = 0;
+            config.max_num_stages = 2;
+            converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0);
             ASSERT_TRUE(converter != NULL);
 
             EXPECT_EQ(converter->up_rate, 1);
             EXPECT_EQ(converter->down_rate, rate);
- 
+
             for (smpl = 0; smpl < MAXRATE * NUMSAMPLES; smpl++) {
                 input[smpl] = 0.0f;
             }
@@ -276,7 +295,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
             in_prog = out_prog = 0;
             while (in_prog < rate * NUMSAMPLES) {
                 uint32_t num_outputs;
-                ret = R2samplerRateConverter_Process(converter,
+                ret = R2samplerMultiStageRateConverter_Process(converter,
                         &input[in_prog], NUMINPUTS,
                         &output[out_prog], num_buffer_samples - out_prog, &num_outputs);
                 assert(R2SAMPLERRATECONVERTER_APIRESULT_OK == ret);
@@ -293,7 +312,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
                 EXPECT_FLOAT_EQ(1.0f, output[smpl]);
             }
 
-            R2samplerRateConverter_Destroy(converter);
+            R2samplerMultiStageRateConverter_Destroy(converter);
             free(output);
         }
 #undef MAXRATE
@@ -306,7 +325,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
 #define MAXRATE  32
 #define NUMSAMPLES 32
 #define NUMINPUTS 1
-        struct R2samplerRateConverter *converter;
+        struct R2samplerMultiStageRateConverter *converter;
         R2samplerRateConverterApiResult ret;
         float input[MAXRATE * NUMSAMPLES];
         float *output;
@@ -317,7 +336,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
                 const uint32_t num_buffer_samples
                     = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(in_rate * NUMSAMPLES, in_rate, out_rate);
                 uint32_t in_prog, out_prog, smpl;
-                struct R2samplerRateConverterConfig config;
+                struct R2samplerMultiStageRateConverterConfig config;
 
                 /* 互いに素ではないケースは弾く */
                 if (R2sampler_GCD(in_rate, out_rate) != 1) {
@@ -326,13 +345,14 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
 
                 output = (float *)malloc(sizeof(float) * num_buffer_samples);
 
-                config.max_num_input_samples = in_rate * NUMINPUTS;
-                config.input_rate = in_rate;
-                config.output_rate = out_rate;
-                config.filter_type = R2SAMPLER_FILTERTYPE_NONE;
-                config.filter_order = 0;
+                config.single.max_num_input_samples = in_rate * NUMINPUTS;
+                config.single.input_rate = in_rate;
+                config.single.output_rate = out_rate;
+                config.single.filter_type = R2SAMPLER_FILTERTYPE_NONE;
+                config.single.filter_order = 0;
+                config.max_num_stages = 2;
 
-                converter = R2samplerRateConverter_Create(&config, NULL, 0);
+                converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0);
                 ASSERT_TRUE(converter != NULL);
 
                 for (smpl = 0; smpl < MAXRATE * NUMSAMPLES; smpl++) {
@@ -345,7 +365,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
                 in_prog = out_prog = 0;
                 while (in_prog < in_rate * NUMSAMPLES) {
                     uint32_t num_outputs;
-                    ret = R2samplerRateConverter_Process(converter,
+                    ret = R2samplerMultiStageRateConverter_Process(converter,
                             &input[in_prog], NUMINPUTS,
                             &output[out_prog], num_buffer_samples - out_prog, &num_outputs);
                     ASSERT_EQ(R2SAMPLERRATECONVERTER_APIRESULT_OK, ret);
@@ -365,7 +385,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
                     }
                 }
 
-                R2samplerRateConverter_Destroy(converter);
+                R2samplerMultiStageRateConverter_Destroy(converter);
                 free(output);
             }
         }

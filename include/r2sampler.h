@@ -26,6 +26,12 @@ struct R2samplerRateConverterConfig {
     uint32_t filter_order; /* 0 or 奇数 */
 };
 
+/* マルチステージレート変換器生成コンフィグ */
+struct R2samplerMultiStageRateConverterConfig {
+    struct R2samplerRateConverterConfig single;
+    uint32_t max_num_stages;
+};
+
 /* API結果型 */
 typedef enum R2samplerRateConverterApiResult {
     R2SAMPLERRATECONVERTER_APIRESULT_OK = 0,
@@ -37,6 +43,9 @@ typedef enum R2samplerRateConverterApiResult {
 
 /* レート変換器ハンドル */
 struct R2samplerRateConverter;
+
+/* マルチステージレート変換器ハンドル */
+struct R2samplerMultiStageRateConverter;
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,6 +67,25 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Start(struct R2samplerRat
 /* レート変換 */
 R2samplerRateConverterApiResult R2samplerRateConverter_Process(
         struct R2samplerRateConverter *converter,
+        const float *input, uint32_t num_input_samples,
+        float *output_buffer, uint32_t num_buffer_samples, uint32_t *num_output_samples);
+
+/* マルチステージレート変換器作成に必要なワークサイズ計算 */
+int32_t R2samplerMultiStageRateConverter_CalculateWorkSize(const struct R2samplerMultiStageRateConverterConfig *config);
+
+/* マルチステージレート変換器作成 */
+struct R2samplerMultiStageRateConverter *R2samplerMultiStageRateConverter_Create(
+        const struct R2samplerMultiStageRateConverterConfig *config, void *work, int32_t work_size);
+
+/* マルチステージレート変換器破棄 */
+void R2samplerMultiStageRateConverter_Destroy(struct R2samplerMultiStageRateConverter *converter);
+
+/* マルチステージレート変換開始（内部バッファリセット） */
+R2samplerRateConverterApiResult R2samplerMultiStageRateConverter_Start(struct R2samplerMultiStageRateConverter *converter);
+
+/* レート変換 */
+R2samplerRateConverterApiResult R2samplerMultiStageRateConverter_Process(
+        struct R2samplerMultiStageRateConverter *converter,
         const float *input, uint32_t num_input_samples,
         float *output_buffer, uint32_t num_buffer_samples, uint32_t *num_output_samples);
 
