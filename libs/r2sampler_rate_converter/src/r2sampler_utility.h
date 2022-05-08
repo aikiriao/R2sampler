@@ -1,5 +1,5 @@
-#ifndef R2SAMPLER_LPF_H_INCLUDED
-#define R2SAMPLER_LPF_H_INCLUDED
+#ifndef R2SAMPLER_UTILITY_H_INCLUDED
+#define R2SAMPLER_UTILITY_H_INCLUDED
 
 #include <stdint.h>
 
@@ -13,8 +13,15 @@ typedef enum R2samplerLPFWindowType {
 extern "C" {
 #endif /* __cplusplus */
 
+/* xとyの最大公約数を求める */
+uint32_t R2sampler_GCD(uint32_t x, uint32_t y);
+
+/* 指定された個数内で素因数分解を実行（残った因数は末尾に） */
+void R2sampler_Factorize(
+        uint32_t x, uint32_t *factors, uint32_t max_num_factors, uint32_t *num_factors);
+
 /* 窓関数によりLPF設計 */
-void R2samplerLPF_CreateLPFByWindowFunction(
+void R2sampler_CreateLPFByWindowFunction(
         float cutoff, R2samplerLPFWindowType window_type,
         float *filter_coef, uint32_t filter_order);
 
@@ -23,4 +30,4 @@ void R2samplerLPF_CreateLPFByWindowFunction(
 #endif /* __cplusplus */
 
 
-#endif /* R2SAMPLER_LPF_H_INCLUDED */
+#endif /* R2SAMPLER_UTILITY_H_INCLUDED */

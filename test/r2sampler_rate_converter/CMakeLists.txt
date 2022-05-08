@@ -8,7 +8,7 @@ set(TEST_NAME r2sampler_rate_converter_test)
 # 実行形式ファイル
 add_executable(${TEST_NAME}
     r2sampler_rate_converter_test.cpp
-    r2sampler_lpf_test.cpp
+    r2sampler_utility_test.cpp
     main.cpp
     )
 

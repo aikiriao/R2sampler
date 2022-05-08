@@ -4,7 +4,7 @@
 #include <assert.h>
 
 #include "ring_buffer.h"
-#include "r2sampler_lpf.h"
+#include "r2sampler_utility.h"
 
 /* メモリアラインメント */
 #define R2SAMPLERRATECONVERTER_ALIGNMENT 16
@@ -33,20 +33,6 @@ struct R2samplerRateConverter {
     uint8_t alloc_by_own;
     void *work;
 };
-
-/* xとyの最大公約数を求める */
-static uint32_t R2samplerRateConverter_GCD(uint32_t x, uint32_t y)
-{
-    uint32_t t;
-
-    while (y != 0) {
-        t = x % y;
-        x = y;
-        y = t;
-    }
-
-    return x;
-}
 
 /* 素朴な直線畳み込み(in-place) */
 static void R2samplerFIRFilter_Convolve(
@@ -111,7 +97,7 @@ int32_t R2samplerRateConverter_CalculateWorkSize(const struct R2samplerRateConve
         struct RingBufferConfig buffer_config;
 
         /* バッファに必要なサンプル数（=正規化した入出力レート）を計算 */
-        gcd = R2samplerRateConverter_GCD(config->input_rate, config->output_rate);
+        gcd = R2sampler_GCD(config->input_rate, config->output_rate);
         assert(((config->input_rate % gcd) == 0) && ((config->output_rate % gcd) == 0));
         tmp_up_rate = config->output_rate / gcd;
         tmp_down_rate = config->input_rate / gcd;
@@ -196,7 +182,7 @@ struct R2samplerRateConverter *R2samplerRateConverter_Create(
         struct RingBufferConfig buffer_config;
 
         /* バッファに必要なサンプル数（=正規化した入力レート）を計算 */
-        gcd = R2samplerRateConverter_GCD(config->input_rate, config->output_rate);
+        gcd = R2sampler_GCD(config->input_rate, config->output_rate);
         assert(((config->input_rate % gcd) == 0) && ((config->output_rate % gcd) == 0));
         tmp_up_rate = config->output_rate / gcd;
         tmp_down_rate = config->input_rate / gcd;
@@ -250,7 +236,7 @@ struct R2samplerRateConverter *R2samplerRateConverter_Create(
             uint32_t i;
             /* 阻止域の厳しい方に設定 */
             const float cutoff = 0.5f / R2SAMPLERRATECONVERTER_MAX(converter->up_rate, converter->down_rate);
-            R2samplerLPF_CreateLPFByWindowFunction(cutoff,
+            R2sampler_CreateLPFByWindowFunction(cutoff,
                     R2SAMPLERLPF_WINDOW_TYPE_HANN, converter->filter.coef, converter->filter.order);
             /* 利得調整 */
             for (i = 0; i < converter->filter.order; i++) {

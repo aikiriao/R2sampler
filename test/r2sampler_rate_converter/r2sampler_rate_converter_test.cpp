@@ -316,7 +316,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
                 struct R2samplerRateConverterConfig config;
 
                 /* 互いに素ではないケースは弾く */
-                if (R2samplerRateConverter_GCD(in_rate, out_rate) != 1) {
+                if (R2sampler_GCD(in_rate, out_rate) != 1) {
                     continue;
                 }
 

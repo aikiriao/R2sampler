@@ -1,4 +1,4 @@
-#include "r2sampler_lpf.h"
+#include "r2sampler_utility.h"
 
 #include <math.h>
 #include <assert.h>
@@ -19,8 +19,72 @@ static float hanning_window(float x)
     return 0.5f - 0.5f * cosf(2.0f * (float)R2SAMPLER_PI * x);
 }
 
+/* xとyの最大公約数を求める */
+uint32_t R2sampler_GCD(uint32_t x, uint32_t y)
+{
+    uint32_t t;
+
+    while (y != 0) {
+        t = x % y;
+        x = y;
+        y = t;
+    }
+
+    return x;
+}
+
+/* 指定された個数内で素因数分解を実行（残った因数は末尾に） */
+void R2sampler_Factorize(
+        uint32_t x, uint32_t *factors, uint32_t max_num_factors, uint32_t *num_factors)
+{
+    uint32_t d, q, idx;
+
+    assert((factors != NULL) && (num_factors != NULL));
+
+    /* 1分割のケース */
+    if (max_num_factors == 1) {
+        factors[0] = x;
+        (*num_factors) = 1;
+        return;
+    }
+
+    idx = 0;
+
+    /* 2で割り続ける */
+    while ((x >= 4) && ((x % 2) == 0)) {
+        factors[idx++] = 2;
+        x /= 2;
+        if (idx == (max_num_factors - 1)) {
+            goto END;
+        }
+    }
+
+    /* 3以上の素数で試す */
+    d = 3;
+    q = x / d;
+    while (q >= d) {
+        if ((x % d) == 0) {
+            factors[idx++] = d;
+            x = q;
+            if (idx == (max_num_factors - 1)) {
+                goto END;
+            }
+        } else {
+            d += 2;
+        }
+        q = x / d;
+    }
+
+END:
+    /* 残った因数を追加 */
+    factors[idx++] = x;
+    (*num_factors) = idx;
+
+    assert(idx <= max_num_factors);
+}
+
 /* 窓関数によりLPF設計 */
-void R2samplerLPF_CreateLPFByWindowFunction(
+void R2sampler_CreateLPFByWindowFunction(
         float cutoff, R2samplerLPFWindowType window_type,
         float *filter_coef, uint32_t filter_order)
 {
