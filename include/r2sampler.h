@@ -6,6 +6,9 @@
 /* ライブラリバージョン */
 #define R2SAMPLER_VERSION 0
 
+/* 最大のステージ数 */
+#define R2SAMPLER_MAX_NUM_STAGES 10
+
 /* 入力に対して必要になる最大のサンプル数計算 */
 #define R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(max_num_input_samples, input_rate, output_rate)\
     ((((max_num_input_samples) * (output_rate) + (input_rate) - 1)) / (input_rate))

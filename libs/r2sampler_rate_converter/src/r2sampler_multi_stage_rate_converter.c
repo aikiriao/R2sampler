@@ -35,7 +35,7 @@ int32_t R2samplerMultiStageRateConverter_CalculateWorkSize(const struct R2sample
     int32_t work_size, tmp_work_size;
     uint32_t i, gcd, tmp_up_rate, tmp_down_rate, tmp_max_num_input_samples;
     uint32_t tmp_num_up_stages, tmp_num_down_stages;
-    uint32_t *up_factors, *down_factors;
+    uint32_t up_factors[R2SAMPLER_MAX_NUM_STAGES], down_factors[R2SAMPLER_MAX_NUM_STAGES];
     struct R2samplerRateConverterConfig tmp_config;
 
     /* 引数チェック */
@@ -45,7 +45,8 @@ int32_t R2samplerMultiStageRateConverter_CalculateWorkSize(const struct R2sample
 
     /* コンフィグチェック */
     if ((config->max_num_stages == 0) || (config->single.max_num_input_samples == 0)
-            || (config->single.input_rate == 0) || (config->single.output_rate == 0)) {
+            || (config->single.input_rate == 0) || (config->single.output_rate == 0)
+            || (config->max_num_stages > R2SAMPLER_MAX_NUM_STAGES)) {
         return -1;
     }
 
@@ -61,8 +62,6 @@ int32_t R2samplerMultiStageRateConverter_CalculateWorkSize(const struct R2sample
     work_size += 2 * (sizeof(float) * config->single.max_num_input_samples * tmp_up_rate + R2SAMPLERMSRATECONVERTER_ALIGNMENT);
 
     /* 入出力レートを素因数分解し、因数で分割したレート変換器のサイズを計算 */
-    up_factors = (uint32_t *)alloca(sizeof(uint32_t) * config->max_num_stages);
-    down_factors = (uint32_t *)alloca(sizeof(uint32_t) * config->max_num_stages);
     R2sampler_Factorize(tmp_up_rate, up_factors, config->max_num_stages, &tmp_num_up_stages);
     R2sampler_Factorize(tmp_down_rate, down_factors, config->max_num_stages, &tmp_num_down_stages);
 
@@ -112,7 +111,7 @@ struct R2samplerMultiStageRateConverter *R2samplerMultiStageRateConverter_Create
     uint8_t *work_ptr;
     uint32_t i, gcd, tmp_up_rate, tmp_down_rate;
     uint32_t tmp_num_up_stages, tmp_num_down_stages;
-    uint32_t *up_factors, *down_factors;
+    uint32_t up_factors[R2SAMPLER_MAX_NUM_STAGES], down_factors[R2SAMPLER_MAX_NUM_STAGES];
 
     /* ワーク領域時前確保の場合 */
     if ((work == NULL) && (work_size == 0)) {
@@ -131,7 +130,8 @@ struct R2samplerMultiStageRateConverter *R2samplerMultiStageRateConverter_Create
 
     /* コンフィグチェック */
     if ((config->max_num_stages == 0) || (config->single.max_num_input_samples == 0)
-            || (config->single.input_rate == 0) || (config->single.output_rate == 0)) {
+            || (config->single.input_rate == 0) || (config->single.output_rate == 0)
+            || (config->max_num_stages > R2SAMPLER_MAX_NUM_STAGES)) {
         return NULL;
     }
 
@@ -167,8 +167,6 @@ struct R2samplerMultiStageRateConverter *R2samplerMultiStageRateConverter_Create
     converter->max_num_buffer_samples = tmp_up_rate * config->single.max_num_input_samples;
 
     /* 入出力レートを素因数分解し、因数で分割したレート変換器のサイズを計算 */
-    up_factors = (uint32_t *)alloca(sizeof(uint32_t) * config->max_num_stages);
-    down_factors = (uint32_t *)alloca(sizeof(uint32_t) * config->max_num_stages);
     R2sampler_Factorize(tmp_up_rate, up_factors, config->max_num_stages, &tmp_num_up_stages);
     R2sampler_Factorize(tmp_down_rate, down_factors, config->max_num_stages, &tmp_num_down_stages);
 

@@ -52,6 +52,10 @@ TEST(R2samplerMultiStageRateConverterTest, CreateDestroyHandleTest)
         R2samplerMultiStageRateConverter_SetValidConfig(&config);
         config.max_num_stages = 0;
         EXPECT_TRUE(R2samplerMultiStageRateConverter_CalculateWorkSize(&config) < 0);
+
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.max_num_stages = R2SAMPLER_MAX_NUM_STAGES + 1;
+        EXPECT_TRUE(R2samplerMultiStageRateConverter_CalculateWorkSize(&config) < 0);
     }
 
     /* ワーク領域渡しによるハンドル作成（成功例） */
@@ -142,6 +146,11 @@ TEST(R2samplerMultiStageRateConverterTest, CreateDestroyHandleTest)
         config.max_num_stages = 0;
         converter = R2samplerMultiStageRateConverter_Create(&config, work, work_size);
         EXPECT_TRUE(converter == NULL);
+
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.max_num_stages = R2SAMPLER_MAX_NUM_STAGES + 1;
+        converter = R2samplerMultiStageRateConverter_Create(&config, work, work_size);
+        EXPECT_TRUE(converter == NULL);
     }
 
     /* 自前確保によるハンドル作成（失敗ケース） */
@@ -173,6 +182,11 @@ TEST(R2samplerMultiStageRateConverterTest, CreateDestroyHandleTest)
 
         R2samplerMultiStageRateConverter_SetValidConfig(&config);
         config.max_num_stages = 0;
+        converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0);
+        EXPECT_TRUE(converter == NULL);
+
+        R2samplerMultiStageRateConverter_SetValidConfig(&config);
+        config.max_num_stages = R2SAMPLER_MAX_NUM_STAGES + 1;
         converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0);
         EXPECT_TRUE(converter == NULL);
     }
