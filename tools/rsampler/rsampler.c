@@ -19,6 +19,9 @@ static struct CommandLineParserSpecification command_line_spec[] = {
     { 'r', "output-rate", COMMAND_LINE_PARSER_TRUE,
         "Specify output sampling rate",
         NULL, COMMAND_LINE_PARSER_FALSE },
+    { 'q', "quality", COMMAND_LINE_PARSER_TRUE,
+        "Specify resampling quality. 0:low(fast) - 9:high(slow) (default:5)",
+        "5", COMMAND_LINE_PARSER_TRUE },
     { 'h', "help", COMMAND_LINE_PARSER_FALSE,
         "Show command help message",
         NULL, COMMAND_LINE_PARSER_FALSE },
@@ -35,7 +38,8 @@ static float myroundf(float f)
 }
 
 /* レート変換実行 */
-static int do_rate_convert(const char *input_file, const char *output_file, uint32_t output_rate)
+static int do_rate_convert(
+        const char *input_file, const char *output_file, uint32_t output_rate, uint32_t quality)
 {
 #define NUM_BUFFER_SAMPLES 64
     uint32_t ch, num_output_buffer_samples;
@@ -70,8 +74,8 @@ static int do_rate_convert(const char *input_file, const char *output_file, uint
         config.single.input_rate = inwav->format.sampling_rate;
         config.single.output_rate = output_rate;
         config.single.filter_type = R2SAMPLER_FILTERTYPE_LPF_BLACKMANWINDOW;
-        config.single.filter_order = 101;
-        config.max_num_stages = 6;
+        config.single.filter_order = 11 + quality * 10;
+        config.max_num_stages = R2SAMPLER_MAX_NUM_STAGES;
 
         if ((converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0)) == NULL) {
             fprintf(stderr, "Failed to create converter handle. \n");
@@ -143,7 +147,7 @@ static void print_usage(char** argv)
 /* バージョン情報の表示 */
 static void print_version_info(void)
 {
-    printf("Rsampler -- Wav file Re-sampler version.%d \n", R2SAMPLER_VERSION);
+    printf("Rsampler -- Wav file Re-sampler Version.%d \n", R2SAMPLER_VERSION);
 }
 
 /* メインエントリ */
@@ -152,7 +156,7 @@ int main(int argc, char** argv)
     const char* filename_ptr[2] = { NULL, NULL };
     const char* input_file;
     const char* output_file;
-    uint32_t output_rate;
+    uint32_t output_rate, quality;
 
     /* 引数が足らない */
     if (argc == 1) {
@@ -197,20 +201,34 @@ int main(int argc, char** argv)
         fprintf(stderr, "%s: output-rate must be specified. \n", argv[0]);
         return 1;
     }
-
     /* 出力レート文字列のパース */
     {
         char *e;
         const char *lstr = CommandLineParser_GetArgumentString(command_line_spec, "output-rate");
         output_rate = (uint32_t)strtol(lstr, &e, 10);
-        if (*e != '\0'){
-            fprintf(stderr, "%s: irregular character found in %s at %s\n", argv[0], lstr, e);
+        if (*e != '\0') {
+            fprintf(stderr, "%s: invalid output sampling rate. (irregular character found in %s at %s)\n", argv[0], lstr, e);
+            return 1;
+        }
+    }
+
+    /* クオリティのパース */
+    {
+        char *e;
+        const char *lstr = CommandLineParser_GetArgumentString(command_line_spec, "quality");
+        quality = (uint32_t)strtol(lstr, &e, 10);
+        if (*e != '\0') {
+            fprintf(stderr, "%s: invalid quality. (irregular character found in %s at %s)\n", argv[0], lstr, e);
+            return 1;
+        }
+        if (quality >= 10) {
+            fprintf(stderr, "%s: invalid quality. (quality must be in range 0 to 9. specifyed:%d)\n", argv[0], quality);
             return 1;
         }
     }
 
     /* レート変換実行 */
-    if (do_rate_convert(input_file, output_file, output_rate) != 0) {
+    if (do_rate_convert(input_file, output_file, output_rate, quality) != 0) {
         fprintf(stderr, "%s: failed to rate conversion. \n", argv[0]);
         return 1;
     }
