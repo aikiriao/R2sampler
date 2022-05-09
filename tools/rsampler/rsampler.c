@@ -119,7 +119,7 @@ static int do_rate_convert(
                 fflush(stdout);
             }
         }
-        assert(out_progress == outwav->format.num_samples);
+        assert(out_progress <= outwav->format.num_samples);
     }
 
     /* 結果出力 */

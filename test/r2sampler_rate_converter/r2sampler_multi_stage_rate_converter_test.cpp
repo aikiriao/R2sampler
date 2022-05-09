@@ -73,8 +73,7 @@ TEST(R2samplerMultiStageRateConverterTest, CreateDestroyHandleTest)
         ASSERT_TRUE(converter != NULL);
         EXPECT_TRUE(converter->work == work);
         EXPECT_EQ(0, converter->alloc_by_own);
-        EXPECT_TRUE(converter->up_sampler != NULL);
-        EXPECT_TRUE(converter->down_sampler != NULL);
+        EXPECT_TRUE(converter->resampler != NULL);
         EXPECT_TRUE(converter->process_buffer[0] != NULL);
         EXPECT_TRUE(converter->process_buffer[1] != NULL);
         EXPECT_EQ(config.max_num_stages, converter->max_num_stages);
@@ -94,8 +93,7 @@ TEST(R2samplerMultiStageRateConverterTest, CreateDestroyHandleTest)
         ASSERT_TRUE(converter != NULL);
         EXPECT_TRUE(converter->work != NULL);
         EXPECT_EQ(1, converter->alloc_by_own);
-        EXPECT_TRUE(converter->up_sampler != NULL);
-        EXPECT_TRUE(converter->down_sampler != NULL);
+        EXPECT_TRUE(converter->resampler != NULL);
         EXPECT_TRUE(converter->process_buffer[0] != NULL);
         EXPECT_TRUE(converter->process_buffer[1] != NULL);
         EXPECT_EQ(config.max_num_stages, converter->max_num_stages);

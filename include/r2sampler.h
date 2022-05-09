@@ -10,8 +10,9 @@
 #define R2SAMPLER_MAX_NUM_STAGES 10
 
 /* 入力に対して必要になる最大のサンプル数計算 */
+/* 入力サンプル * (出力レート/入力レート) の切り上げが基本で、内部にバッファリングされるサンプルを考慮しoutput_rateを加算 */
 #define R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(max_num_input_samples, input_rate, output_rate)\
-    ((((max_num_input_samples) * (output_rate) + (input_rate) - 1)) / (input_rate))
+    ((((max_num_input_samples) * (output_rate) + (output_rate) + (input_rate) - 1)) / (input_rate))
 
 /* （ローパス）フィルタタイプ */
 typedef enum R2samplerFilterType {
