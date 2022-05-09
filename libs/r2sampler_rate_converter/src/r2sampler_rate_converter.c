@@ -87,8 +87,8 @@ int32_t R2samplerRateConverter_CalculateWorkSize(const struct R2samplerRateConve
         work_size += tmp_work_size;
     }
 
-    /* フィルタワークサイズ計算（係数+入力履歴） */
-    work_size += 2 * (sizeof(float) * config->filter_order + R2SAMPLERRATECONVERTER_ALIGNMENT);
+    /* フィルタ係数サイズ計算 */
+    work_size += sizeof(float) * config->filter_order + R2SAMPLERRATECONVERTER_ALIGNMENT;
     /* 補間データバッファサイズ計算 */
     work_size += sizeof(float) * config->max_num_input_samples * tmp_up_rate + R2SAMPLERRATECONVERTER_ALIGNMENT;
 
@@ -182,7 +182,7 @@ struct R2samplerRateConverter *R2samplerRateConverter_Create(
         converter->down_rate = tmp_down_rate;
     }
 
-    /* フィルタの領域確保 */
+    /* フィルタ係数の領域確保 */
     work_ptr = (uint8_t *)R2SAMPLERRATECONVERTER_ROUNDUP((uintptr_t)work_ptr, R2SAMPLERRATECONVERTER_ALIGNMENT);
     converter->filter_coef = (float *)work_ptr;
     work_ptr += sizeof(float) * config->filter_order;
