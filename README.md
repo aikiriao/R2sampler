@@ -28,7 +28,7 @@ cmake --build build
 Example command for resampling input Wav to 48000 Hz.
 
 ```bash
-./rsampler -r 48000 INPUT.wav OUTPUT.lnn
+./rsampler -r 48000 INPUT.wav OUTPUT.wav
 ```
 
 ## License
