@@ -19,7 +19,7 @@ TEST(R2samplerMultiStageRateConverterTest, CreateDestroyHandleTest)
         config__p->single.input_rate            = 44100;\
         config__p->single.output_rate           = 48000;\
         config__p->single.filter_type           = R2SAMPLER_FILTERTYPE_NONE;\
-        config__p->single.filter_order          = 3;\
+        config__p->single.filter_order          = 1;\
         config__p->max_num_stages               = 4;\
     } while (0);
 
@@ -218,7 +218,7 @@ TEST(R2samplerMultiStageRateConverterTest, RateConvertTest)
             config.single.input_rate = 1;
             config.single.output_rate = rate;
             config.single.filter_type = R2SAMPLER_FILTERTYPE_NONE;
-            config.single.filter_order = 0;
+            config.single.filter_order = 1;
             config.max_num_stages = 2;
             converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0);
             ASSERT_TRUE(converter != NULL);
@@ -287,7 +287,7 @@ TEST(R2samplerMultiStageRateConverterTest, RateConvertTest)
             config.single.input_rate = rate;
             config.single.output_rate = 1;
             config.single.filter_type = R2SAMPLER_FILTERTYPE_NONE;
-            config.single.filter_order = 0;
+            config.single.filter_order = 1;
             config.max_num_stages = 2;
             converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0);
             ASSERT_TRUE(converter != NULL);
@@ -363,7 +363,7 @@ TEST(R2samplerMultiStageRateConverterTest, RateConvertTest)
                 config.single.input_rate = in_rate;
                 config.single.output_rate = out_rate;
                 config.single.filter_type = R2SAMPLER_FILTERTYPE_NONE;
-                config.single.filter_order = 0;
+                config.single.filter_order = 1;
                 config.max_num_stages = 2;
 
                 converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0);
@@ -407,5 +407,4 @@ TEST(R2samplerMultiStageRateConverterTest, RateConvertTest)
 #undef NUMSAMPLES
 #undef NUMINPUTS
     }
-
 }

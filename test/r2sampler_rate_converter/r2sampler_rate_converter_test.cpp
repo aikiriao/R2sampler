@@ -15,11 +15,11 @@ TEST(R2samplerRateConverterTest, CreateDestroyHandleTest)
 #define R2samplerRateConverter_SetValidConfig(p_config)\
     do {\
         struct R2samplerRateConverterConfig *config__p = p_config;\
-        config__p->max_num_input_samples        = 32;\
-        config__p->input_rate                   = 44100;\
-        config__p->output_rate                  = 48000;\
-        config__p->filter_type                  = R2SAMPLER_FILTERTYPE_NONE;\
-        config__p->filter_order                 = 3;\
+        config__p->max_num_input_samples    = 32;\
+        config__p->input_rate               = 44100;\
+        config__p->output_rate              = 48000;\
+        config__p->filter_type              = R2SAMPLER_FILTERTYPE_NONE;\
+        config__p->filter_order             = 1;\
     } while (0);
 
     /* ワークサイズ計算テスト */
@@ -66,8 +66,8 @@ TEST(R2samplerRateConverterTest, CreateDestroyHandleTest)
         EXPECT_EQ(0, converter->alloc_by_own);
         EXPECT_TRUE(converter->output_buffer != NULL);
         EXPECT_TRUE(converter->interp_buffer != NULL);
-        EXPECT_TRUE(converter->filter.coef != NULL);
-        EXPECT_EQ(config.filter_order, converter->filter.order);
+        EXPECT_TRUE(converter->filter_coef != NULL);
+        EXPECT_EQ(config.filter_order, converter->filter_order);
 
         R2samplerRateConverter_Destroy(converter);
         free(work);
@@ -86,8 +86,8 @@ TEST(R2samplerRateConverterTest, CreateDestroyHandleTest)
         EXPECT_EQ(1, converter->alloc_by_own);
         EXPECT_TRUE(converter->output_buffer != NULL);
         EXPECT_TRUE(converter->interp_buffer != NULL);
-        EXPECT_TRUE(converter->filter.coef != NULL);
-        EXPECT_EQ(config.filter_order, converter->filter.order);
+        EXPECT_TRUE(converter->filter_coef != NULL);
+        EXPECT_EQ(config.filter_order, converter->filter_order);
 
         R2samplerRateConverter_Destroy(converter);
     }
@@ -187,7 +187,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
             config.input_rate = 1;
             config.output_rate = rate;
             config.filter_type = R2SAMPLER_FILTERTYPE_NONE;
-            config.filter_order = 0;
+            config.filter_order = 1;
             converter = R2samplerRateConverter_Create(&config, NULL, 0);
             ASSERT_TRUE(converter != NULL);
 
@@ -255,7 +255,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
             config.input_rate = rate;
             config.output_rate = 1;
             config.filter_type = R2SAMPLER_FILTERTYPE_NONE;
-            config.filter_order = 0;
+            config.filter_order = 1;
             converter = R2samplerRateConverter_Create(&config, NULL, 0);
             ASSERT_TRUE(converter != NULL);
 
@@ -330,7 +330,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
                 config.input_rate = in_rate;
                 config.output_rate = out_rate;
                 config.filter_type = R2SAMPLER_FILTERTYPE_NONE;
-                config.filter_order = 0;
+                config.filter_order = 1;
 
                 converter = R2samplerRateConverter_Create(&config, NULL, 0);
                 ASSERT_TRUE(converter != NULL);
@@ -368,6 +368,144 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
                 R2samplerRateConverter_Destroy(converter);
                 free(output);
             }
+        }
+#undef MAXRATE
+#undef NUMSAMPLES
+#undef NUMINPUTS
+    }
+
+    /* rate倍に補間（LPF使用） */
+    {
+#define MAXRATE 16
+#define NUMSAMPLES 16
+#define NUMINPUTS 1
+        struct R2samplerRateConverter *converter;
+        R2samplerRateConverterApiResult ret;
+        float input[NUMSAMPLES];
+        float *output;
+        uint32_t in_prog, out_prog, smpl, rate;
+
+        for (rate = 1; rate <= MAXRATE; rate++) {
+            const uint32_t num_buffer_samples
+                = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(NUMSAMPLES, 1, rate);
+            uint32_t in_prog, out_prog, smpl, delay;
+            struct R2samplerRateConverterConfig config;
+
+            output = (float *)malloc(sizeof(float) * num_buffer_samples);
+
+            config.max_num_input_samples = NUMINPUTS;
+            config.input_rate = 1;
+            config.output_rate = rate;
+            config.filter_type = R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW;
+            config.filter_order = 3;
+            converter = R2samplerRateConverter_Create(&config, NULL, 0);
+            ASSERT_TRUE(converter != NULL);
+
+            EXPECT_EQ(converter->up_rate, rate);
+            EXPECT_EQ(converter->down_rate, 1);
+
+            for (smpl = 0; smpl < NUMSAMPLES; smpl++) {
+                input[smpl] = 1.0f;
+            }
+            for (smpl = 0; smpl < num_buffer_samples; smpl++) {
+                output[smpl] = 0.0f;
+            }
+
+            in_prog = out_prog = 0;
+            while (in_prog < NUMSAMPLES) {
+                uint32_t num_outputs;
+                ret = R2samplerRateConverter_Process(converter,
+                        &input[in_prog], NUMINPUTS,
+                        &output[out_prog], num_buffer_samples - out_prog, &num_outputs);
+                ASSERT_EQ(R2SAMPLERRATECONVERTER_APIRESULT_OK, ret);
+
+                in_prog += NUMINPUTS;
+                out_prog += num_outputs;
+            }
+
+            EXPECT_EQ(out_prog, rate * NUMSAMPLES);
+
+            /* rate倍に間引かれて1.0fが配置されているはず（フィルタ遅延込みで） */
+            delay = config.filter_order / 2;
+            for (smpl = 0; smpl < rate * NUMSAMPLES - delay; smpl++) {
+                if ((smpl % rate) == 0) {
+                    EXPECT_FLOAT_EQ(1.0f, output[smpl + delay]);
+                } else {
+                    EXPECT_FLOAT_EQ(0.0f, output[smpl + delay]);
+                }
+            }
+
+            R2samplerRateConverter_Destroy(converter);
+            free(output);
+        }
+#undef MAXRATE
+#undef NUMSAMPLES
+#undef NUMINPUTS
+    }
+
+    /* rate倍に間引き（LPF使用） */
+    {
+#define MAXRATE 16
+#define NUMSAMPLES 16
+#define NUMINPUTS 1
+        struct R2samplerRateConverter *converter;
+        R2samplerRateConverterApiResult ret;
+        float input[MAXRATE * NUMSAMPLES];
+        float *output;
+        uint32_t in_prog, out_prog, smpl, rate;
+
+        for (rate = 1; rate <= MAXRATE; rate++) {
+            const uint32_t num_buffer_samples
+                = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(rate * NUMSAMPLES, rate, 1);
+            uint32_t in_prog, out_prog, smpl, delay;
+            struct R2samplerRateConverterConfig config;
+
+            output = (float *)malloc(sizeof(float) * num_buffer_samples);
+
+            config.max_num_input_samples = rate * NUMINPUTS;
+            config.input_rate = rate;
+            config.output_rate = 1;
+            config.filter_type = R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW;
+            config.filter_order = 1;
+            converter = R2samplerRateConverter_Create(&config, NULL, 0);
+            ASSERT_TRUE(converter != NULL);
+
+            EXPECT_EQ(converter->up_rate, 1);
+            EXPECT_EQ(converter->down_rate, rate);
+
+            for (smpl = 0; smpl < MAXRATE * NUMSAMPLES; smpl++) {
+                input[smpl] = 0.0f;
+            }
+            /* rate間隔で1.0fを配置 */
+            for (smpl = 0; smpl < NUMSAMPLES; smpl++) {
+                input[rate * smpl] = 1.0f;
+            }
+            for (smpl = 0; smpl < num_buffer_samples; smpl++) {
+                output[smpl] = 0.0f;
+            }
+
+            in_prog = out_prog = 0;
+            while (in_prog < rate * NUMSAMPLES) {
+                uint32_t num_outputs;
+                ret = R2samplerRateConverter_Process(converter,
+                        &input[in_prog], NUMINPUTS,
+                        &output[out_prog], num_buffer_samples - out_prog, &num_outputs);
+                assert(R2SAMPLERRATECONVERTER_APIRESULT_OK == ret);
+                ASSERT_EQ(R2SAMPLERRATECONVERTER_APIRESULT_OK, ret);
+
+                in_prog += NUMINPUTS;
+                out_prog += num_outputs;
+            }
+
+            EXPECT_EQ(out_prog, NUMSAMPLES);
+
+            /* LPF係数が乗算され1/rateのみになる */
+            for (smpl = 0; smpl < NUMSAMPLES; smpl++) {
+                EXPECT_FLOAT_EQ(1.0f / rate, output[smpl]);
+            }
+
+            R2samplerRateConverter_Destroy(converter);
+            free(output);
         }
 #undef MAXRATE
 #undef NUMSAMPLES

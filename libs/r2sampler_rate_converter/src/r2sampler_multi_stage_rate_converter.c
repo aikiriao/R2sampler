@@ -61,14 +61,21 @@ int32_t R2samplerMultiStageRateConverter_CalculateWorkSize(const struct R2sample
     /* 補間データバッファx2サイズ計算 */
     work_size += 2 * (sizeof(float) * config->single.max_num_input_samples * tmp_up_rate + R2SAMPLERMSRATECONVERTER_ALIGNMENT);
 
-    /* 入出力レートを素因数分解し、因数で分割したレート変換器のサイズを計算 */
+    /* 入出力レートを素因数分解 */
     R2sampler_Factorize(tmp_up_rate, up_factors, config->max_num_stages, &tmp_num_up_stages);
     R2sampler_Factorize(tmp_down_rate, down_factors, config->max_num_stages, &tmp_num_down_stages);
+    /* アップサンプル・ダウンサンプルのみの場合は省略可能 */
+    if (up_factors[0] == 1) {
+        tmp_num_up_stages = 0;
+    } else if (down_factors[0] == 1) {
+        tmp_num_down_stages = 0;
+    }
 
     /* ハンドルのポインタ領域を計算 */
     work_size += sizeof(struct R2samplerRateConverter *) * tmp_num_up_stages + R2SAMPLERMSRATECONVERTER_ALIGNMENT;
     work_size += sizeof(struct R2samplerRateConverter *) * tmp_num_down_stages + R2SAMPLERMSRATECONVERTER_ALIGNMENT;
 
+    /* 因数で分割したレート変換器のサイズを計算 */
     /* アップサンプラ分 */
     tmp_max_num_input_samples = config->single.max_num_input_samples;
     for (i = 0; i < tmp_num_up_stages; i++) {
@@ -169,6 +176,12 @@ struct R2samplerMultiStageRateConverter *R2samplerMultiStageRateConverter_Create
     /* 入出力レートを素因数分解し、因数で分割したレート変換器のサイズを計算 */
     R2sampler_Factorize(tmp_up_rate, up_factors, config->max_num_stages, &tmp_num_up_stages);
     R2sampler_Factorize(tmp_down_rate, down_factors, config->max_num_stages, &tmp_num_down_stages);
+    /* アップサンプル・ダウンサンプルのみの場合は省略可能 */
+    if (up_factors[0] == 1) {
+        tmp_num_up_stages = 0;
+    } else if (down_factors[0] == 1) {
+        tmp_num_down_stages = 0;
+    }
 
     /* アップサンプラ・ダウンサンプラステージ数を記録 */
     converter->num_up_stages = tmp_num_up_stages;
@@ -321,7 +334,7 @@ R2samplerRateConverterApiResult R2samplerMultiStageRateConverter_Process(
         SWAP_POINTER(pinput, poutput);
         num_input = num_output;
     }
-    assert(num_output == (converter->up_rate * num_input_samples));
+    assert((converter->num_up_stages == 0) || (num_output == (converter->up_rate * num_input_samples)));
 
     /* ダウンサンプル */
     for (i = 0; i < converter->num_down_stages; i++) {
