@@ -113,7 +113,7 @@ static int do_rate_convert(
             out_progress += num_output_samples;
 
             /* 進捗表示 */
-            if (in_progress % (NUM_BUFFER_SAMPLES * 20) == 0) {
+            if (in_progress % (NUM_BUFFER_SAMPLES * 50) == 0) {
                 printf("progress... %5.2f%% \r",
                         ((in_progress + ch * inwav->format.num_samples) * 100.0f) / (inwav->format.num_channels * inwav->format.num_samples));
                 fflush(stdout);
@@ -127,6 +127,8 @@ static int do_rate_convert(
         fprintf(stderr, "Failed to write file. \n");
         return 1;
     }
+
+    printf("finished!                                ");
 
     /* リソース破棄 */
     R2samplerMultiStageRateConverter_Destroy(converter);
