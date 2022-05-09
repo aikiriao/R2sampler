@@ -74,7 +74,7 @@ static int do_rate_convert(
         config.single.input_rate = inwav->format.sampling_rate;
         config.single.output_rate = output_rate;
         config.single.filter_type = R2SAMPLER_FILTERTYPE_LPF_BLACKMANWINDOW;
-        config.single.filter_order = 11 + quality * 10;
+        config.single.filter_order = 11 + quality * 20;
         config.max_num_stages = R2SAMPLER_MAX_NUM_STAGES;
 
         if ((converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0)) == NULL) {
@@ -219,10 +219,6 @@ int main(int argc, char** argv)
         quality = (uint32_t)strtol(lstr, &e, 10);
         if (*e != '\0') {
             fprintf(stderr, "%s: invalid quality. (irregular character found in %s at %s)\n", argv[0], lstr, e);
-            return 1;
-        }
-        if (quality >= 10) {
-            fprintf(stderr, "%s: invalid quality. (quality must be in range 0 to 9. specifyed:%d)\n", argv[0], quality);
             return 1;
         }
     }
