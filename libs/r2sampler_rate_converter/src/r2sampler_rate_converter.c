@@ -350,7 +350,7 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Process(
         converter->interp_buffer[smpl * converter->up_rate] = input[smpl];
     }
 
-    /* ゼロ値挿入したデータをディレイラインに入力 */
+    /* ゼロ値挿入したデータをディレイバッファに入力 */
     rbf_ret = RingBuffer_Put(converter->output_buffer,
             converter->interp_buffer, sizeof(float) * converter->up_rate * num_input_samples);
     assert(rbf_ret == RINGBUFFER_APIRESULT_OK);
@@ -360,7 +360,8 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Process(
         uint32_t i;
         float *pdecim;
         const uint32_t half_order = converter->filter_order / 2;
-        rbf_ret = RingBuffer_Peek(converter->output_buffer, (void **)&pdecim, sizeof(float) * converter->filter_order);
+        /* ディレイバッファから取得（同時にdown_rateだけ進めて間引く） */
+        rbf_ret = RingBuffer_Get(converter->output_buffer, (void **)&pdecim, sizeof(float) * converter->down_rate);
         assert(rbf_ret == RINGBUFFER_APIRESULT_OK);
         /* フィルタ適用: 係数は奇数かつ偶対象であることを使用 */
         /* note: up_rate間隔でデータが並んでいる以外は全て0なので更に減らせるが複雑になる */
@@ -368,9 +369,6 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Process(
         for (i = 0; i < half_order; i++) {
             output_buffer[smpl] += (pdecim[i] + pdecim[converter->filter_order - i - 1]) * converter->filter_coef[i];
         }
-        /* 間引く分データを捨てる */
-        rbf_ret = RingBuffer_Get(converter->output_buffer, (void **)&pdecim, sizeof(float) * converter->down_rate);
-        assert(rbf_ret == RINGBUFFER_APIRESULT_OK);
     }
 
     /* 出力サンプル数をセット */
