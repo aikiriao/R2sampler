@@ -27,6 +27,7 @@ struct R2samplerRateConverter {
     R2samplerFilterType filter_type;
     uint32_t filter_order;
     float *filter_coef;
+    uint32_t interp_offset;
     uint8_t alloc_by_own;
     void *work;
 };
@@ -279,6 +280,9 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Start(struct R2samplerRat
         i += num_put_samples;
     }
 
+    /* ゼロ値挿入したデータの非ゼロ値のオフセットをリセット */
+    converter->interp_offset = (converter->filter_order - 1) % converter->up_rate;
+
     return R2SAMPLERRATECONVERTER_APIRESULT_OK;
 }
 
@@ -356,18 +360,38 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Process(
     assert(rbf_ret == RINGBUFFER_APIRESULT_OK);
 
     /* 間引きしつつフィルタリング */
-    for (smpl = 0; smpl < tmp_num_output_samples; smpl++) {
-        uint32_t i;
-        float *pdecim;
+    if (converter->up_rate > 1) {
+        /* ゼロ値挿入分をスキップした処理 */
+        /* ゼロ値挿入したデータの先頭位置の更新量: up_rate - down_rate */
+        const uint32_t interp_delta = converter->down_rate * (converter->up_rate - 1);
+        for (smpl = 0; smpl < tmp_num_output_samples; smpl++) {
+            uint32_t i;
+            float* pdecim;
+            /* ディレイバッファから取得（同時にdown_rateだけ進めて間引く） */
+            rbf_ret = RingBuffer_Get(converter->output_buffer, (void**)&pdecim, sizeof(float) * converter->down_rate);
+            assert(rbf_ret == RINGBUFFER_APIRESULT_OK);
+            /* up_rate間隔でデータが並んでいる以外は全て0なので積和演算をスキップ可 */
+            output_buffer[smpl] = 0.0f;
+            for (i = converter->interp_offset; i < converter->filter_order; i += converter->up_rate) {
+                output_buffer[smpl] += pdecim[i] * converter->filter_coef[i];
+            }
+            /* ゼロ値挿入したデータの非ゼロ値のオフセット更新 */
+            converter->interp_offset = (converter->interp_offset + interp_delta) % converter->up_rate;
+        }
+    } else {
+        /* 通常のFIRフィルタによる畳み込み */
         const uint32_t half_order = converter->filter_order / 2;
-        /* ディレイバッファから取得（同時にdown_rateだけ進めて間引く） */
-        rbf_ret = RingBuffer_Get(converter->output_buffer, (void **)&pdecim, sizeof(float) * converter->down_rate);
-        assert(rbf_ret == RINGBUFFER_APIRESULT_OK);
-        /* フィルタ適用: 係数は奇数かつ偶対象であることを使用 */
-        /* note: up_rate間隔でデータが並んでいる以外は全て0なので更に減らせるが複雑になる */
-        output_buffer[smpl] = pdecim[half_order] * converter->filter_coef[half_order];
-        for (i = 0; i < half_order; i++) {
-            output_buffer[smpl] += (pdecim[i] + pdecim[converter->filter_order - i - 1]) * converter->filter_coef[i];
+        for (smpl = 0; smpl < tmp_num_output_samples; smpl++) {
+            uint32_t i;
+            float* pdecim;
+            /* ディレイバッファから取得（同時にdown_rateだけ進めて間引く） */
+            rbf_ret = RingBuffer_Get(converter->output_buffer, (void**)&pdecim, sizeof(float) * converter->down_rate);
+            assert(rbf_ret == RINGBUFFER_APIRESULT_OK);
+            /* フィルタ適用: 係数は奇数かつ偶対象であることを使用 */
+            output_buffer[smpl] = pdecim[half_order] * converter->filter_coef[half_order];
+            for (i = 0; i < half_order; i++) {
+                output_buffer[smpl] += (pdecim[i] + pdecim[converter->filter_order - i - 1]) * converter->filter_coef[i];
+            }
         }
     }
 
