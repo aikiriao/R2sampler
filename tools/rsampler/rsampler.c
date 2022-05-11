@@ -19,6 +19,9 @@ static struct CommandLineParserSpecification command_line_spec[] = {
     { 'r', "output-rate", COMMAND_LINE_PARSER_TRUE,
         "Specify output sampling rate",
         NULL, COMMAND_LINE_PARSER_FALSE },
+    { 'b', "buffer-size", COMMAND_LINE_PARSER_TRUE,
+        "Specify process buffer size. (default:128)",
+        "128", COMMAND_LINE_PARSER_TRUE },
     { 'q', "quality", COMMAND_LINE_PARSER_TRUE,
         "Specify resampling quality. 0:low(fast) - 9:high(slow) (default:5)",
         "5", COMMAND_LINE_PARSER_TRUE },
@@ -39,9 +42,9 @@ static double myroundf(double f)
 
 /* レート変換実行 */
 static int do_rate_convert(
-        const char *input_file, const char *output_file, uint32_t output_rate, uint32_t quality)
+        const char *input_file, const char *output_file,
+        uint32_t output_rate, uint32_t num_buffer_samples, uint32_t quality)
 {
-#define NUM_BUFFER_SAMPLES 64
     uint32_t ch, num_output_buffer_samples;
     struct WAVFile *inwav, *outwav;
     struct WAVFileFormat outformat;
@@ -63,14 +66,14 @@ static int do_rate_convert(
     outwav = WAV_Create(&outformat);
 
     /* 変換バッファ作成 */
-    input_buffer = (float *)malloc(sizeof(float) * NUM_BUFFER_SAMPLES);
-    num_output_buffer_samples = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(NUM_BUFFER_SAMPLES, inwav->format.sampling_rate, output_rate);
+    input_buffer = (float *)malloc(sizeof(float) * num_buffer_samples);
+    num_output_buffer_samples = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(num_buffer_samples, inwav->format.sampling_rate, output_rate);
     output_buffer = (float *)malloc(sizeof(float) * num_output_buffer_samples);
 
     /* レート変換器作成 */
     {
         struct R2samplerMultiStageRateConverterConfig config;
-        config.single.max_num_input_samples = NUM_BUFFER_SAMPLES;
+        config.single.max_num_input_samples = num_buffer_samples;
         config.single.input_rate = inwav->format.sampling_rate;
         config.single.output_rate = output_rate;
         config.single.filter_type = R2SAMPLER_FILTERTYPE_LPF_BLACKMANWINDOW;
@@ -92,7 +95,7 @@ static int do_rate_convert(
             uint32_t smpl, num_process_samples, num_output_samples;
             R2samplerRateConverterApiResult ret;
             /* 処理サンプル数 */
-            num_process_samples = RSAMPLER_MIN(NUM_BUFFER_SAMPLES, inwav->format.num_samples - in_progress);
+            num_process_samples = RSAMPLER_MIN(num_buffer_samples, inwav->format.num_samples - in_progress);
             /* floatに変換 */
             for (smpl = 0; smpl < num_process_samples; smpl++) {
                 input_buffer[smpl] = (float)(WAVFile_PCM(inwav, in_progress + smpl, ch) * pow(2.0f, -31));
@@ -113,7 +116,7 @@ static int do_rate_convert(
             out_progress += num_output_samples;
 
             /* 進捗表示 */
-            if (in_progress % (NUM_BUFFER_SAMPLES * 50) == 0) {
+            if (in_progress % (num_buffer_samples * 50) == 0) {
                 printf("progress... %5.2f%% \r",
                         ((in_progress + ch * inwav->format.num_samples) * 100.0f) / (inwav->format.num_channels * inwav->format.num_samples));
                 fflush(stdout);
@@ -158,7 +161,7 @@ int main(int argc, char** argv)
     const char* filename_ptr[2] = { NULL, NULL };
     const char* input_file;
     const char* output_file;
-    uint32_t output_rate, quality;
+    uint32_t num_buffer_samples, output_rate, quality;
 
     /* 引数が足らない */
     if (argc == 1) {
@@ -214,6 +217,17 @@ int main(int argc, char** argv)
         }
     }
 
+    /* バッファサイズのパース */
+    {
+        char *e;
+        const char *lstr = CommandLineParser_GetArgumentString(command_line_spec, "buffer-size");
+        num_buffer_samples = (uint32_t)strtol(lstr, &e, 10);
+        if (*e != '\0') {
+            fprintf(stderr, "%s: invalid buffer size. (irregular character found in %s at %s)\n", argv[0], lstr, e);
+            return 1;
+        }
+    }
+
     /* クオリティのパース */
     {
         char *e;
@@ -226,7 +240,7 @@ int main(int argc, char** argv)
     }
 
     /* レート変換実行 */
-    if (do_rate_convert(input_file, output_file, output_rate, quality) != 0) {
+    if (do_rate_convert(input_file, output_file, output_rate, num_buffer_samples, quality) != 0) {
         fprintf(stderr, "%s: failed to rate conversion. \n", argv[0]);
         return 1;
     }
