@@ -19,7 +19,7 @@ typedef enum R2samplerFilterType {
     R2SAMPLER_FILTERTYPE_NONE = 0,           /* フィルタを適用しない */
     R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW,     /* Hann窓によるLPF */
     R2SAMPLER_FILTERTYPE_LPF_BLACKMANWINDOW, /* Blackman窓によるLPF */
-    R2SAMPLER_FILTERTYPE_LPF_NUTTALLWINDOW,  /* Nuttall窓によるLPF */
+    R2SAMPLER_FILTERTYPE_LPF_NUTTALLWINDOW   /* Nuttall窓によるLPF */
 } R2samplerFilterType;
 
 /* レート変換器生成コンフィグ */

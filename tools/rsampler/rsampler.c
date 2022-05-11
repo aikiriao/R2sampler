@@ -95,7 +95,7 @@ static int do_rate_convert(
             num_process_samples = RSAMPLER_MIN(NUM_BUFFER_SAMPLES, inwav->format.num_samples - in_progress);
             /* floatに変換 */
             for (smpl = 0; smpl < num_process_samples; smpl++) {
-                input_buffer[smpl] = (float)WAVFile_PCM(inwav, in_progress + smpl, ch) * pow(2.0f, -31);
+                input_buffer[smpl] = (float)(WAVFile_PCM(inwav, in_progress + smpl, ch) * pow(2.0f, -31));
             }
             /* レート変換処理 */
             if ((ret = R2samplerMultiStageRateConverter_Process(converter,
