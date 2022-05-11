@@ -67,7 +67,7 @@ static int do_rate_convert(
 
     /* 変換バッファ作成 */
     input_buffer = (float *)malloc(sizeof(float) * num_buffer_samples);
-    num_output_buffer_samples = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(num_buffer_samples, inwav->format.sampling_rate, output_rate);
+    num_output_buffer_samples = R2SAMPLER_MAX_NUM_OUTPUT_SAMPLES(num_buffer_samples, inwav->format.sampling_rate, output_rate);
     output_buffer = (float *)malloc(sizeof(float) * num_output_buffer_samples);
 
     /* レート変換器作成 */

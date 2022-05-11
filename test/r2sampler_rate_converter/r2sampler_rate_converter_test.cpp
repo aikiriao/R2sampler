@@ -177,7 +177,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
 
         for (rate = 1; rate <= MAXRATE; rate++) {
             const uint32_t num_buffer_samples
-                = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(NUMSAMPLES, 1, rate);
+                = R2SAMPLER_MAX_NUM_OUTPUT_SAMPLES(NUMSAMPLES, 1, rate);
             uint32_t in_prog, out_prog, smpl;
             struct R2samplerRateConverterConfig config;
 
@@ -245,7 +245,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
 
         for (rate = 1; rate <= MAXRATE; rate++) {
             const uint32_t num_buffer_samples
-                = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(rate * NUMSAMPLES, rate, 1);
+                = R2SAMPLER_MAX_NUM_OUTPUT_SAMPLES(rate * NUMSAMPLES, rate, 1);
             uint32_t in_prog, out_prog, smpl;
             struct R2samplerRateConverterConfig config;
 
@@ -315,7 +315,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
         for (in_rate = 1; in_rate <= MAXRATE; in_rate++) {
             for (out_rate = 1; out_rate <= MAXRATE; out_rate++) {
                 const uint32_t num_buffer_samples
-                    = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(in_rate * NUMSAMPLES, in_rate, out_rate);
+                    = R2SAMPLER_MAX_NUM_OUTPUT_SAMPLES(in_rate * NUMSAMPLES, in_rate, out_rate);
                 uint32_t in_prog, out_prog, smpl;
                 struct R2samplerRateConverterConfig config;
 
@@ -387,7 +387,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
 
         for (rate = 1; rate <= MAXRATE; rate++) {
             const uint32_t num_buffer_samples
-                = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(NUMSAMPLES, 1, rate);
+                = R2SAMPLER_MAX_NUM_OUTPUT_SAMPLES(NUMSAMPLES, 1, rate);
             uint32_t in_prog, out_prog, smpl, delay;
             struct R2samplerRateConverterConfig config;
 
@@ -456,7 +456,7 @@ TEST(R2samplerRateConverterTest, RateConvertTest)
 
         for (rate = 1; rate <= MAXRATE; rate++) {
             const uint32_t num_buffer_samples
-                = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(rate * NUMSAMPLES, rate, 1);
+                = R2SAMPLER_MAX_NUM_OUTPUT_SAMPLES(rate * NUMSAMPLES, rate, 1);
             uint32_t in_prog, out_prog, smpl, delay;
             struct R2samplerRateConverterConfig config;
 

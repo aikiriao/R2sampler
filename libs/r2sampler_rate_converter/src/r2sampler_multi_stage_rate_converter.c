@@ -128,7 +128,7 @@ int32_t R2samplerMultiStageRateConverter_CalculateWorkSize(const struct R2sample
         work_size += tmp_work_size;
         /* 次のステージで必要になるサンプル数 */
         tmp_max_num_input_samples
-            = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(tmp_max_num_input_samples, udconfig[i].down_rate, udconfig[i].up_rate);
+            = R2SAMPLER_MAX_NUM_OUTPUT_SAMPLES(tmp_max_num_input_samples, udconfig[i].down_rate, udconfig[i].up_rate);
     }
 
     return work_size;
@@ -231,7 +231,7 @@ struct R2samplerMultiStageRateConverter* R2samplerMultiStageRateConverter_Create
             work_ptr += tmp_work_size;
             /* 次のステージで必要になるサンプル数 */
             tmp_max_num_input_samples
-                = R2SAMPLERRATECONVERTER_MAX_NUM_OUTPUT_SAMPLES(tmp_max_num_input_samples, udconfig[i].down_rate, udconfig[i].up_rate);
+                = R2SAMPLER_MAX_NUM_OUTPUT_SAMPLES(tmp_max_num_input_samples, udconfig[i].down_rate, udconfig[i].up_rate);
         }
     }
 
