@@ -80,8 +80,6 @@ int32_t R2samplerMultiStageRateConverter_CalculateWorkSize(const struct R2sample
 {
     int32_t work_size, tmp_work_size;
     uint32_t i, gcd, tmp_up_rate, tmp_down_rate, tmp_max_num_input_samples;
-    uint32_t tmp_num_up_stages, tmp_num_down_stages;
-    uint32_t up_factors[R2SAMPLER_MAX_NUM_STAGES], down_factors[R2SAMPLER_MAX_NUM_STAGES];
     struct R2samplerRateConverterConfig tmp_config;
 
     uint32_t num_stages;
