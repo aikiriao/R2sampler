@@ -128,7 +128,7 @@ static int do_rate_convert(
         return 1;
     }
 
-    printf("finished!                                ");
+    printf("finished!                                \n");
 
     /* リソース破棄 */
     R2samplerMultiStageRateConverter_Destroy(converter);
