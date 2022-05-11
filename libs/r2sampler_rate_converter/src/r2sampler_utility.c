@@ -25,6 +25,12 @@ static double blackman_window(double x)
     return 0.42 - 0.5 * cos(2.0 * R2SAMPLER_PI * x) + 0.08 * cos(4.0 * R2SAMPLER_PI * x);
 }
 
+/* Nuttall窓 0 <= x <= 1 */
+static double nuttall_window(double x)
+{
+    return 0.355768 - 0.487396 * cos(2.0 * R2SAMPLER_PI * x) + 0.144232 * cos(4.0 * R2SAMPLER_PI * x) - 0.012604 * cos(6.0 * R2SAMPLER_PI * x);
+}
+
 /* xとyの最大公約数を求める */
 uint32_t R2sampler_GCD(uint32_t x, uint32_t y)
 {
@@ -131,6 +137,12 @@ void R2sampler_CreateLPFByWindowFunction(
         /* Blackman窓 */
         for (i = 0; i < filter_order; i++) {
             filter_coef[i] *= (float)blackman_window(i / (filter_order - 1.0f));
+        }
+        break;
+    case R2SAMPLERLPF_WINDOW_TYPE_NUTTALL:
+        /* Blackman窓 */
+        for (i = 0; i < filter_order; i++) {
+            filter_coef[i] *= (float)nuttall_window(i / (filter_order - 1.0f));
         }
         break;
     default:
