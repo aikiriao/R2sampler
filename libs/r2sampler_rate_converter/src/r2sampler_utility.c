@@ -8,21 +8,21 @@
 #define R2SAMPLER_PI 3.14159265358979323846
 
 /* sinc関数 */
-static float sinc(float x)
+static double sinc(double x)
 {
-    return (fabs(x) > 1.0e-8) ? (sinf(x) / x) : 1.0f;
+    return (fabs(x) > 1.0e-8) ? (sin(x) / x) : 1.0;
 }
 
 /* ハン窓 0 <= x <= 1 */
-static float hanning_window(float x)
+static double hanning_window(double x)
 {
-    return 0.5f - 0.5f * cosf(2.0f * (float)R2SAMPLER_PI * x);
+    return 0.5 - 0.5 * cos(2.0 * R2SAMPLER_PI * x);
 }
 
 /* Blackman窓 0 <= x <= 1 */
-static float blackman_window(float x)
+static double blackman_window(double x)
 {
-    return 0.42f - 0.5f * cosf(2.0f * (float)R2SAMPLER_PI * x) + 0.08f * cosf(4.0f * (float)R2SAMPLER_PI * x);
+    return 0.42 - 0.5 * cos(2.0 * R2SAMPLER_PI * x) + 0.08 * cos(4.0 * R2SAMPLER_PI * x);
 }
 
 /* xとyの最大公約数を求める */
@@ -107,7 +107,7 @@ void R2sampler_CreateLPFByWindowFunction(
     /* sinc関数により理想LPFの係数を取得 */
     for (i = 0; i < filter_order; i++) {
         const float x = (float)i - half;
-        filter_coef[i] = 2.0f * cutoff * sinc(2.0f * (float)R2SAMPLER_PI * cutoff * x);
+        filter_coef[i] = 2.0f * cutoff * (float)sinc(2.0f * R2SAMPLER_PI * cutoff * x);
     }
 
     /* フィルタサイズが1の場合は矩形窓に読み替えて終わり */
@@ -124,13 +124,13 @@ void R2sampler_CreateLPFByWindowFunction(
     case R2SAMPLERLPF_WINDOW_TYPE_HANN:
         /* ハン窓 */
         for (i = 0; i < filter_order; i++) {
-            filter_coef[i] *= hanning_window(i / (filter_order - 1.0f));
+            filter_coef[i] *= (float)hanning_window(i / (filter_order - 1.0f));
         }
         break;
     case R2SAMPLERLPF_WINDOW_TYPE_BLACKMAN:
         /* Blackman窓 */
         for (i = 0; i < filter_order; i++) {
-            filter_coef[i] *= blackman_window(i / (filter_order - 1.0f));
+            filter_coef[i] *= (float)blackman_window(i / (filter_order - 1.0f));
         }
         break;
     default:
