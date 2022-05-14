@@ -35,7 +35,7 @@ static struct CommandLineParserSpecification command_line_spec[] = {
 };
 
 /* round関数 */
-static double myroundf(double f)
+static double myround(double f)
 {
     return (f >= 0.0f) ? floor(f + 0.5f) : -floor(-f + 0.5f);
 }
@@ -109,7 +109,7 @@ static int do_rate_convert(
             }
             /* 結果を整数に丸め込み */
             for (smpl = 0; smpl < num_output_samples; smpl++) {
-                const int64_t pcm = (int64_t)myroundf(output_buffer[smpl] * pow(2.0f, 31));
+                const int64_t pcm = (int64_t)myround(output_buffer[smpl] * pow(2.0f, 31));
                 WAVFile_PCM(outwav, out_progress + smpl, ch) = (int32_t)RSAMPLER_INNER_VAL(pcm, INT32_MIN, INT32_MAX);
             }
             in_progress += num_process_samples;
