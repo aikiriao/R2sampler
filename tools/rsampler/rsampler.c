@@ -37,7 +37,7 @@ static struct CommandLineParserSpecification command_line_spec[] = {
 /* round関数 */
 static double myround(double f)
 {
-    return (f >= 0.0f) ? floor(f + 0.5f) : -floor(-f + 0.5f);
+    return (f >= 0.0) ? floor(f + 0.5) : -floor(-f + 0.5);
 }
 
 /* レート変換実行 */
