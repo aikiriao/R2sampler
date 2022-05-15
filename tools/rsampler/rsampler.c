@@ -45,11 +45,11 @@ static int do_rate_convert(
         const char *input_file, const char *output_file,
         uint32_t output_rate, uint32_t num_buffer_samples, uint32_t quality)
 {
-    uint32_t ch, num_output_buffer_samples;
+    uint32_t ch, num_channels, num_samples, num_output_buffer_samples;
     struct WAVFile *inwav, *outwav;
     struct WAVFileFormat outformat;
     float *input_buffer, *output_buffer;
-    struct R2samplerMultiStageRateConverter *converter;
+    struct R2samplerMultiStageRateConverter **srcs;
 
     /* 入力wavファイルを開く */
     if ((inwav = WAV_CreateFromFile(input_file)) == NULL) {
@@ -57,10 +57,14 @@ static int do_rate_convert(
         return 1;
     }
 
+    /* 入力wavのフォーマット取得 */
+    num_channels = inwav->format.num_channels;
+    num_samples = inwav->format.num_samples;
+
     /* 出力wavのフォーマット設定 */
     outformat = inwav->format;
     outformat.sampling_rate = output_rate;
-    outformat.num_samples = (uint32_t)(((uint64_t)inwav->format.num_samples * output_rate) / inwav->format.sampling_rate);
+    outformat.num_samples = (uint32_t)(((uint64_t)num_samples * output_rate) / inwav->format.sampling_rate);
 
     /* 出力wavファイル作成 */
     outwav = WAV_Create(&outformat);
@@ -80,28 +84,31 @@ static int do_rate_convert(
         config.single.filter_order = 11 + quality * 20;
         config.max_num_stages = R2SAMPLER_MAX_NUM_STAGES;
 
-        if ((converter = R2samplerMultiStageRateConverter_Create(&config, NULL, 0)) == NULL) {
-            fprintf(stderr, "Failed to create converter handle. \n");
-            return 1;
+        srcs = (struct R2samplerMultiStageRateConverter **)malloc(sizeof(struct R2samplerMultiStageRateConverter *) * num_channels);
+        for (ch = 0; ch < num_channels; ch++) {
+            if ((srcs[ch] = R2samplerMultiStageRateConverter_Create(&config, NULL, 0)) == NULL) {
+                fprintf(stderr, "Failed to create converter handle. \n");
+                return 1;
+            }
         }
     }
 
     /* レート変換 */
-    for (ch = 0; ch < inwav->format.num_channels; ch++) {
+    for (ch = 0; ch < num_channels; ch++) {
         uint32_t in_progress, out_progress;
         in_progress = out_progress = 0;
-        R2samplerMultiStageRateConverter_Start(converter);
-        while (in_progress < inwav->format.num_samples) {
+        R2samplerMultiStageRateConverter_Start(srcs[ch]);
+        while (in_progress < num_samples) {
             uint32_t smpl, num_process_samples, num_output_samples;
             R2samplerRateConverterApiResult ret;
             /* 処理サンプル数 */
-            num_process_samples = RSAMPLER_MIN(num_buffer_samples, inwav->format.num_samples - in_progress);
+            num_process_samples = RSAMPLER_MIN(num_buffer_samples, num_samples - in_progress);
             /* floatに変換 */
             for (smpl = 0; smpl < num_process_samples; smpl++) {
                 input_buffer[smpl] = (float)(WAVFile_PCM(inwav, in_progress + smpl, ch) * pow(2.0f, -31));
             }
             /* レート変換処理 */
-            if ((ret = R2samplerMultiStageRateConverter_Process(converter,
+            if ((ret = R2samplerMultiStageRateConverter_Process(srcs[ch],
                     input_buffer, num_process_samples,
                     output_buffer, num_output_buffer_samples, &num_output_samples)) != R2SAMPLERRATECONVERTER_APIRESULT_OK) {
                 fprintf(stderr, "Failed to process rate conversion. (api ret:%d) \n", ret);
@@ -114,11 +121,10 @@ static int do_rate_convert(
             }
             in_progress += num_process_samples;
             out_progress += num_output_samples;
-
             /* 進捗表示 */
             if (in_progress % (num_buffer_samples * 50) == 0) {
                 printf("progress... %5.2f%% \r",
-                        ((in_progress + ch * inwav->format.num_samples) * 100.0f) / (inwav->format.num_channels * inwav->format.num_samples));
+                        ((in_progress + ch * num_samples) * 100.0f) / (num_channels * num_samples));
                 fflush(stdout);
             }
         }
@@ -134,7 +140,10 @@ static int do_rate_convert(
     printf("finished!                                \n");
 
     /* リソース破棄 */
-    R2samplerMultiStageRateConverter_Destroy(converter);
+    for (ch = 0; ch < num_channels; ch++) {
+        R2samplerMultiStageRateConverter_Destroy(srcs[ch]);
+    }
+    free(srcs);
     free(output_buffer);
     free(input_buffer);
     WAV_Destroy(outwav);
