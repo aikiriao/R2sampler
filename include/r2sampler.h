@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 /* ライブラリバージョン */
-#define R2SAMPLER_VERSION 1
+#define R2SAMPLER_VERSION 2
 
 /* 最大のステージ数 */
 #define R2SAMPLER_MAX_NUM_STAGES 10
@@ -19,7 +19,8 @@ typedef enum R2samplerFilterType {
     R2SAMPLER_FILTERTYPE_NONE = 0,           /* フィルタを適用しない */
     R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW,     /* Hann窓によるLPF */
     R2SAMPLER_FILTERTYPE_LPF_BLACKMANWINDOW, /* Blackman窓によるLPF */
-    R2SAMPLER_FILTERTYPE_LPF_NUTTALLWINDOW   /* Nuttall窓によるLPF */
+    R2SAMPLER_FILTERTYPE_LPF_NUTTALLWINDOW,  /* Nuttall窓によるLPF */
+    R2SAMPLER_FILTERTYPE_LPF_BLACKMANNUTTALLWINDOW /* Blackman-Nuttall窓によるLPF */
 } R2samplerFilterType;
 
 /* レート変換器生成コンフィグ */

@@ -207,6 +207,7 @@ struct R2samplerRateConverter *R2samplerRateConverter_Create(
     case R2SAMPLER_FILTERTYPE_LPF_HANNWINDOW:
     case R2SAMPLER_FILTERTYPE_LPF_BLACKMANWINDOW:
     case R2SAMPLER_FILTERTYPE_LPF_NUTTALLWINDOW:
+    case R2SAMPLER_FILTERTYPE_LPF_BLACKMANNUTTALLWINDOW:
         {
             uint32_t i;
             R2samplerLPFWindowType window_type = R2SAMPLERLPF_WINDOW_TYPE_INVALID;
@@ -222,6 +223,9 @@ struct R2samplerRateConverter *R2samplerRateConverter_Create(
                 break;
             case R2SAMPLER_FILTERTYPE_LPF_NUTTALLWINDOW:
                 window_type = R2SAMPLERLPF_WINDOW_TYPE_NUTTALL;
+                break;
+            case R2SAMPLER_FILTERTYPE_LPF_BLACKMANNUTTALLWINDOW:
+                window_type = R2SAMPLERLPF_WINDOW_TYPE_BLACKMANNUTTALL;
                 break;
             default:
                 assert(0);
