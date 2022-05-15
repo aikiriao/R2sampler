@@ -23,7 +23,7 @@ static struct CommandLineParserSpecification command_line_spec[] = {
         "Specify process buffer size. (default:128)",
         "128", COMMAND_LINE_PARSER_TRUE },
     { 'q', "quality", COMMAND_LINE_PARSER_TRUE,
-        "Specify resampling quality. 0:low(fast) - 9:high(slow) (default:5)",
+        "Specify resampling quality. 0:low(fast), ..., 9:high(slow), 10, ... (default:5)",
         "5", COMMAND_LINE_PARSER_TRUE },
     { 'h', "help", COMMAND_LINE_PARSER_FALSE,
         "Show command help message",
