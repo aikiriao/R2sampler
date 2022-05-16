@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 /* ライブラリバージョン */
-#define R2SAMPLER_VERSION 2
+#define R2SAMPLER_VERSION 3
 
 /* 最大のステージ数 */
 #define R2SAMPLER_MAX_NUM_STAGES 10

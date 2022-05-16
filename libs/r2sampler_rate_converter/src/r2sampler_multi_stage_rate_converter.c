@@ -63,12 +63,66 @@ static void R2samplerMultiStageRateConverter_SetUpDownRateConfig(
         config[stage].down_rate = down;
     }
 
+    /* ダウンレートと比べ2（最小素数）倍より大きければアップレートの因数を後ろに移動
+    * （大アップレートが原因で作られる、狭帯域フィルタによる音質劣化回避） */
+    {
+        const uint32_t original_num_stages = stage;
+        uint32_t i, j, tmp_num_up_factors, tmp_up_factors[R2SAMPLER_MAX_NUM_STAGES];
+REDUCE_BIGUPRATE:
+        for (i = 0; i < original_num_stages; i++) {
+            if (config[i].down_rate == 1) {
+                break;
+            }
+            if (config[i].up_rate >= (2 * config[i].down_rate)) {
+                uint32_t moved_up_rate;
+                R2sampler_Factorize(config[i].up_rate,
+                        tmp_up_factors, R2SAMPLER_MAX_NUM_STAGES, &tmp_num_up_factors);
+                /* 素因数ならばスキップ */
+                if (tmp_num_up_factors == 1) {
+                    continue;
+                }
+                /* アップレート>ダウンレートを満たす範囲内で因数を探す */
+                moved_up_rate = 1;
+                for (j = 0; j < tmp_num_up_factors; j++) {
+                    if ((config[i].up_rate / tmp_up_factors[j]) > config[i].down_rate) {
+                        moved_up_rate = tmp_up_factors[j];
+                    }
+                }
+                /* 因数がなければスキップ */
+                if (moved_up_rate == 1) {
+                    continue;
+                }
+                config[i].up_rate /= moved_up_rate;
+                /* アップレートを後ろに移動 */
+                for (j = i + 1; j < original_num_stages; j++) {
+                    if (config[j].up_rate < config[j].down_rate) {
+                        config[j].up_rate *= moved_up_rate;
+                        break;
+                    }
+                }
+                /* ステージ追加 */
+                if (j == original_num_stages) {
+                    config[stage].up_rate = moved_up_rate;
+                    config[stage].down_rate = 1;
+                    stage++;
+                }
+                /* 最初から検索 */
+                goto REDUCE_BIGUPRATE;
+            }
+        }
+    }
+
     /* 残ったアップレートを配置 */
     for (; up_inx < num_up_stages; up_inx++) {
         config[stage].up_rate = up_factors[up_inx];
         config[stage].down_rate = 1;
         stage++;
     }
+
+    /* TODO: まだ最適ではない。全ステージでの(アップレート - ダウンレート)の和を最小化するべき
+    * 例) 44100Hz -> 11000Hz だと(Up,Down)が(5,3), (11,3), (2,7), (1,7)になるが、
+    * (5,3), (11,7), (2,3), (1,7)の方がより良い
+    * 網羅的に(アップレート - ダウンレート)の和を最小化する組み合わせを探す？ */
 
     /* 結果をセット */
     assert(stage < max_num_stages);

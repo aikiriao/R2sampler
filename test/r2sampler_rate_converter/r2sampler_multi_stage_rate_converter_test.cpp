@@ -406,3 +406,51 @@ TEST(R2samplerMultiStageRateConverterTest, RateConvertTest)
 #undef NUMINPUTS
     }
 }
+
+/* アップデート・ダウンレート構築テスト */
+TEST(R2samplerMultiStageRateConverterTest, SetUpDownConfigTest)
+{
+    {
+        uint32_t i;
+        struct UpDownConfigTestCase {
+            uint32_t up_rate;
+            uint32_t down_rate;
+            uint32_t answer_num_stages;
+            struct R2samplerMultiStageUpDownRateConfig answer_config[R2SAMPLER_MAX_NUM_STAGES];
+        };
+        static const struct UpDownConfigTestCase test_cases[] = {
+            {      1,      1, 1, { { 1, 1 }, 0 }, },
+            /* 上がるケース */
+            {      2,      1, 1, { { 2, 1 }, 0 }, },
+            {      6,      1, 2, { { 2, 1 }, { 3, 1 }, 0 }, },
+            { 192000,  44100, 4, { { 4, 3 }, { 8, 7 }, { 10, 7 }, { 2, 1 }, 0 }, },
+            { 384000,  44100, 4, { { 4, 3 }, { 8, 7 }, { 8, 7 }, { 5, 1 }, 0 }, },
+            {  44100,  11000, 3, { { 3, 2 }, { 7, 5 }, { 21, 11 }, 0 }, },
+            /* 下がるケース */
+            {      1,      2, 1, { { 1, 2 }, 0 }, },
+            {      1,      6, 2, { { 1, 2 }, { 1, 3 }, 0 }, },
+            {   3000,  44100, 3, { { 5, 3 }, { 2, 7 }, { 1, 7 }, 0 }, },
+            {   6000,  44100, 3, { { 4, 3 }, { 5, 7 }, { 1, 7 }, 0 }, },
+            {  11000,  44100, 4, { { 5, 3 }, { 11, 3 }, { 2, 7 }, { 1, 7 }, 0 }, },
+        };
+        const uint32_t num_test_cases = sizeof(test_cases) / sizeof(test_cases[0]);
+
+        /* 全テストケース実行 */
+        for (i = 0; i < num_test_cases; i++) {
+            uint32_t j, gcd, test_num_stages;
+            struct R2samplerMultiStageUpDownRateConfig test_config[R2SAMPLER_MAX_NUM_STAGES];
+            const struct UpDownConfigTestCase *ptest = &test_cases[i];
+            test_num_stages = 0;
+            memset(test_config, 0, sizeof(struct R2samplerMultiStageUpDownRateConfig) * R2SAMPLER_MAX_NUM_STAGES);
+            gcd = R2sampler_GCD(ptest->up_rate, ptest->down_rate);
+            R2samplerMultiStageRateConverter_SetUpDownRateConfig(
+                    ptest->up_rate / gcd, ptest->down_rate / gcd,
+                    test_config, R2SAMPLER_MAX_NUM_STAGES, &test_num_stages);
+            EXPECT_EQ(ptest->answer_num_stages, test_num_stages);
+            for (j = 0; j < ptest->answer_num_stages; j++) {
+                EXPECT_EQ(ptest->answer_config[j].up_rate, test_config[j].up_rate);
+                EXPECT_EQ(ptest->answer_config[j].down_rate, test_config[j].down_rate);
+            }
+        }
+    }
+}
