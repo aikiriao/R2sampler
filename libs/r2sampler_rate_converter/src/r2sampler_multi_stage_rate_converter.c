@@ -53,52 +53,56 @@ static void R2samplerMultiStageRateConverter_SetUpDownRateConfig(
     uint32_t up_rate, uint32_t down_rate,
     struct R2samplerMultiStageUpDownRateConfig *config, uint32_t max_num_stages, uint32_t *num_stages)
 {
-    uint32_t i, up, tmp_num_stages;
-    uint32_t up_factors[R2SAMPLER_MAX_NUM_STAGES], down_factors[R2SAMPLER_MAX_NUM_STAGES];
-    uint32_t num_up_stages, num_down_stages;
+    uint32_t i, up, down, stage, num_factors;
+    uint32_t factors[R2SAMPLER_MAX_NUM_STAGES];
 
     assert((config != NULL) && (num_stages != NULL));
     assert(max_num_stages <= R2SAMPLER_MAX_NUM_STAGES);
 
     /* ダウンレートを素因数分解 */
-    R2sampler_Factorize(down_rate, down_factors, R2SAMPLER_MAX_NUM_STAGES, &num_down_stages);
+    R2sampler_Factorize(down_rate, factors, R2SAMPLER_MAX_NUM_STAGES, &num_factors);
 
     /* 各ステージでダウンレートよりも大きくなるようにアップレートを設定 */
-    for (i = 0; i < num_down_stages; i++) {
-        config[i].up_rate = 1;
-        config[i].down_rate = down_factors[i];
+    stage = 0;
+    for (i = 0; i < num_factors; i++) {
+        down = factors[i];
         /* アップレートはup_rateの約数で配置 */
-        for (up = down_factors[i] + 1; up <= up_rate; up++) {
+        for (up = down + 1; up <= up_rate; up++) {
             if (up_rate % up == 0) {
-                config[i].up_rate = up;
-                up_rate /= up;
+                /* up > down を満たす範囲でdownを増やす */
+                while (((i + 1) < num_factors) && (up > (down * factors[i + 1]))) {
+                    down *= factors[i + 1];
+                    i++;
+                }
                 break;
             }
         }
         /* 約数が見つからなければ残りのアップレートを使用 */
-        if (config[i].up_rate == 1) {
-            config[i].up_rate = up_rate;
-            up_rate = 1;
+        if (up > up_rate) {
+            up = up_rate;
         }
+        config[stage].up_rate = up;
+        config[stage].down_rate = down;
+        stage++;
+        up_rate /= up;
     }
-    tmp_num_stages = num_down_stages;
 
     /* 残ったアップレートを配置 */
     if (up_rate > 1) {
-        R2sampler_Factorize(up_rate, up_factors, R2SAMPLER_MAX_NUM_STAGES, &num_up_stages);
-        for (i = 0; i < num_up_stages; i++) {
-            config[num_down_stages + i].up_rate = up_factors[i];
-            config[num_down_stages + i].down_rate = 1;
+        R2sampler_Factorize(up_rate, factors, R2SAMPLER_MAX_NUM_STAGES, &num_factors);
+        for (i = 0; i < num_factors; i++) {
+            config[stage].up_rate = factors[i];
+            config[stage].down_rate = 1;
+            stage++;
         }
-        tmp_num_stages += num_up_stages;
     }
 
     /* レートが昇順に並ぶようにソート（徐々にフィルタを狭帯域にする） */
-    qsort(config, tmp_num_stages, sizeof(struct R2samplerMultiStageUpDownRateConfig), R2samplerMultiStageRateConverter_UpDownConfigCompare);
+    qsort(config, stage, sizeof(struct R2samplerMultiStageUpDownRateConfig), R2samplerMultiStageRateConverter_UpDownConfigCompare);
 
     /* 結果をセット */
-    assert(tmp_num_stages < max_num_stages);
-    (*num_stages) = tmp_num_stages;
+    assert(stage < max_num_stages);
+    (*num_stages) = stage;
 }
 
 /* レート変換器作成に必要なワークサイズ計算 */
