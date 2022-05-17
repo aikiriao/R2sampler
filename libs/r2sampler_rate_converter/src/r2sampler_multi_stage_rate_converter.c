@@ -12,6 +12,8 @@
 #define R2SAMPLERMSRATECONVERTER_ALIGNMENT 16
 /* nの倍数に切り上げ */
 #define R2SAMPLERMSRATECONVERTER_ROUNDUP(val, n) ((((val) + ((n) - 1)) / (n)) * (n))
+/* a,bのうち大きい方を選択 */
+#define R2SAMPLERMSRATECONVERTER_MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 /* マルチステージレート変換器ハンドル */
 struct R2samplerMultiStageRateConverter {
@@ -33,100 +35,71 @@ struct R2samplerMultiStageUpDownRateConfig {
     uint32_t down_rate;
 };
 
+/* アップレート・ダウンレート設定比較 */
+static int UpDownConfigCompare(const void *a, const void *b)
+{
+    const struct R2samplerMultiStageUpDownRateConfig *pa = (const struct R2samplerMultiStageUpDownRateConfig *)a;
+    const struct R2samplerMultiStageUpDownRateConfig *pb = (const struct R2samplerMultiStageUpDownRateConfig *)b;
+    /* ダウンレートの方が大きい場合 変換比が大きい方を後方へ */
+    if ((pa->up_rate < pa->down_rate) || (pb->up_rate < pb->down_rate)) {
+        /* ((pa->down_rate / pa->up_rate) > (pb->down_rate / pb->up_rate)) を変形 */
+        return ((pa->down_rate * pb->up_rate) > (pb->down_rate * pa->up_rate)) ? 1 : -1;
+    }
+    /* レートが大きい方を後方へ */
+    return (R2SAMPLERMSRATECONVERTER_MAX(pa->up_rate, pa->down_rate) > R2SAMPLERMSRATECONVERTER_MAX(pb->up_rate, pb->down_rate)) ? 1 : -1;
+}
+
 /* 各ステージでのアップレート・ダウンレートを設定 */
 static void R2samplerMultiStageRateConverter_SetUpDownRateConfig(
     uint32_t up_rate, uint32_t down_rate,
     struct R2samplerMultiStageUpDownRateConfig *config, uint32_t max_num_stages, uint32_t *num_stages)
 {
-    uint32_t stage, up_inx;
+    uint32_t i, up, tmp_num_stages;
     uint32_t up_factors[R2SAMPLER_MAX_NUM_STAGES], down_factors[R2SAMPLER_MAX_NUM_STAGES];
     uint32_t num_up_stages, num_down_stages;
 
     assert((config != NULL) && (num_stages != NULL));
     assert(max_num_stages <= R2SAMPLER_MAX_NUM_STAGES);
 
-    /* 入力レート・出力レートを素因数分解 */
-    R2sampler_Factorize(up_rate, up_factors, R2SAMPLER_MAX_NUM_STAGES, &num_up_stages);
+    /* ダウンレートを素因数分解 */
     R2sampler_Factorize(down_rate, down_factors, R2SAMPLER_MAX_NUM_STAGES, &num_down_stages);
 
-    /* アップサンプル時に同時に可能な限りダウンサンプリングするように
-    * （ダウンサンプリングを入れつつもレートが上がりつづけるように）設定 */
-    up_inx = 0;
-    for (stage = 0; stage < num_down_stages; stage++) {
-        uint32_t up = 1;
-        uint32_t down = down_factors[stage];
-        /* ダウンレートを追い越すまでアップレートを掛け合わせる */
-        while ((up <= down) && (up_inx < num_up_stages)) {
-            up *= up_factors[up_inx++];
-        }
-        config[stage].up_rate = up;
-        config[stage].down_rate = down;
-    }
-
-    /* ダウンレートと比べ2（最小素数）倍より大きければアップレートの因数を後ろに移動
-    * （大アップレートが原因で作られる、狭帯域フィルタによる音質劣化回避） */
-    {
-        const uint32_t original_num_stages = stage;
-        uint32_t i, j, tmp_num_up_factors, tmp_up_factors[R2SAMPLER_MAX_NUM_STAGES];
-REDUCE_BIGUPRATE:
-        for (i = 0; i < original_num_stages; i++) {
-            if (config[i].down_rate == 1) {
+    /* 各ステージでダウンレートよりも大きくなるようにアップレートを設定 */
+    for (i = 0; i < num_down_stages; i++) {
+        config[i].up_rate = 1;
+        config[i].down_rate = down_factors[i];
+        /* アップレートはup_rateの約数で配置 */
+        for (up = down_factors[i] + 1; up <= up_rate; up++) {
+            if (up_rate % up == 0) {
+                config[i].up_rate = up;
+                up_rate /= up;
                 break;
             }
-            if (config[i].up_rate >= (2 * config[i].down_rate)) {
-                uint32_t moved_up_rate;
-                R2sampler_Factorize(config[i].up_rate,
-                        tmp_up_factors, R2SAMPLER_MAX_NUM_STAGES, &tmp_num_up_factors);
-                /* 素因数ならばスキップ */
-                if (tmp_num_up_factors == 1) {
-                    continue;
-                }
-                /* アップレート>ダウンレートを満たす範囲内で因数を探す */
-                moved_up_rate = 1;
-                for (j = 0; j < tmp_num_up_factors; j++) {
-                    if ((config[i].up_rate / tmp_up_factors[j]) > config[i].down_rate) {
-                        moved_up_rate = tmp_up_factors[j];
-                    }
-                }
-                /* 因数がなければスキップ */
-                if (moved_up_rate == 1) {
-                    continue;
-                }
-                config[i].up_rate /= moved_up_rate;
-                /* アップレートを後ろに移動 */
-                for (j = i + 1; j < original_num_stages; j++) {
-                    if (config[j].up_rate < config[j].down_rate) {
-                        config[j].up_rate *= moved_up_rate;
-                        break;
-                    }
-                }
-                /* ステージ追加 */
-                if (j == original_num_stages) {
-                    config[stage].up_rate = moved_up_rate;
-                    config[stage].down_rate = 1;
-                    stage++;
-                }
-                /* 最初から検索 */
-                goto REDUCE_BIGUPRATE;
-            }
+        }
+        /* 約数が見つからなければ残りのアップレートを使用 */
+        if (config[i].up_rate == 1) {
+            config[i].up_rate = up_rate;
+            up_rate = 1;
         }
     }
+    tmp_num_stages = num_down_stages;
 
     /* 残ったアップレートを配置 */
-    for (; up_inx < num_up_stages; up_inx++) {
-        config[stage].up_rate = up_factors[up_inx];
-        config[stage].down_rate = 1;
-        stage++;
+    if (up_rate > 1) {
+        R2sampler_Factorize(up_rate, up_factors, R2SAMPLER_MAX_NUM_STAGES, &num_up_stages);
+        for (i = 0; i < num_up_stages; i++) {
+            config[num_down_stages + i].up_rate = up_factors[i];
+            config[num_down_stages + i].down_rate = 1;
+        }
+        tmp_num_stages += num_up_stages;
     }
 
-    /* TODO: まだ最適ではない。全ステージでの(アップレート - ダウンレート)の和を最小化するべき
-    * 例) 44100Hz -> 11000Hz だと(Up,Down)が(5,3), (11,3), (2,7), (1,7)になるが、
-    * (5,3), (11,7), (2,3), (1,7)の方がより良い
-    * 網羅的に(アップレート - ダウンレート)の和を最小化する組み合わせを探す？ */
+    /* レートが昇順に並ぶようにソート（徐々にフィルタを狭帯域にする） */
+    qsort(config, tmp_num_stages, sizeof(struct R2samplerMultiStageUpDownRateConfig), UpDownConfigCompare);
 
     /* 結果をセット */
-    assert(stage < max_num_stages);
-    (*num_stages) = stage;
+    assert(tmp_num_stages < max_num_stages);
+    (*num_stages) = tmp_num_stages;
 }
 
 /* レート変換器作成に必要なワークサイズ計算 */
