@@ -5,7 +5,6 @@
 #include <assert.h>
 
 #include "ring_buffer.h"
-#include "r2sampler_rate_converter.h"
 #include "r2sampler_utility.h"
 
 /* メモリアラインメント */
@@ -36,7 +35,7 @@ struct R2samplerMultiStageUpDownRateConfig {
 };
 
 /* アップレート・ダウンレート設定比較 */
-static int UpDownConfigCompare(const void *a, const void *b)
+static int R2samplerMultiStageRateConverter_UpDownConfigCompare(const void *a, const void *b)
 {
     const struct R2samplerMultiStageUpDownRateConfig *pa = (const struct R2samplerMultiStageUpDownRateConfig *)a;
     const struct R2samplerMultiStageUpDownRateConfig *pb = (const struct R2samplerMultiStageUpDownRateConfig *)b;
@@ -95,7 +94,7 @@ static void R2samplerMultiStageRateConverter_SetUpDownRateConfig(
     }
 
     /* レートが昇順に並ぶようにソート（徐々にフィルタを狭帯域にする） */
-    qsort(config, tmp_num_stages, sizeof(struct R2samplerMultiStageUpDownRateConfig), UpDownConfigCompare);
+    qsort(config, tmp_num_stages, sizeof(struct R2samplerMultiStageUpDownRateConfig), R2samplerMultiStageRateConverter_UpDownConfigCompare);
 
     /* 結果をセット */
     assert(tmp_num_stages < max_num_stages);

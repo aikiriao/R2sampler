@@ -1,5 +1,4 @@
 #include <r2sampler.h>
-#include "r2sampler_rate_converter.h"
 
 #include <stdlib.h>
 #include <assert.h>
@@ -295,7 +294,7 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Start(struct R2samplerRat
 }
 
 /* 内部でバッファリングしているサンプル数を取得 */
-uint32_t R2samplerRateConverter_GetNumBufferedSamples(const struct R2samplerRateConverter *converter)
+static uint32_t R2samplerRateConverter_GetNumBufferedSamples(const struct R2samplerRateConverter *converter)
 {
     uint32_t num_buffered_samples;
 
@@ -374,9 +373,9 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Process(
         const uint32_t interp_delta = converter->down_rate * (converter->up_rate - 1);
         for (smpl = 0; smpl < tmp_num_output_samples; smpl++) {
             uint32_t i;
-            float* pdecim;
+            float *pdecim;
             /* ディレイバッファから取得（同時にdown_rateだけ進めて間引く） */
-            rbf_ret = RingBuffer_Get(converter->output_buffer, (void**)&pdecim, sizeof(float) * converter->down_rate);
+            rbf_ret = RingBuffer_Get(converter->output_buffer, (void **)&pdecim, sizeof(float) * converter->down_rate);
             assert(rbf_ret == RINGBUFFER_APIRESULT_OK);
             /* up_rate間隔でデータが並んでいる以外は全て0なので積和演算をスキップ可 */
             output_buffer[smpl] = 0.0f;
@@ -391,9 +390,9 @@ R2samplerRateConverterApiResult R2samplerRateConverter_Process(
         const uint32_t half_order = converter->filter_order / 2;
         for (smpl = 0; smpl < tmp_num_output_samples; smpl++) {
             uint32_t i;
-            float* pdecim;
+            float *pdecim;
             /* ディレイバッファから取得（同時にdown_rateだけ進めて間引く） */
-            rbf_ret = RingBuffer_Get(converter->output_buffer, (void**)&pdecim, sizeof(float) * converter->down_rate);
+            rbf_ret = RingBuffer_Get(converter->output_buffer, (void **)&pdecim, sizeof(float) * converter->down_rate);
             assert(rbf_ret == RINGBUFFER_APIRESULT_OK);
             /* フィルタ適用: 係数は奇数かつ偶対象であることを使用 */
             output_buffer[smpl] = pdecim[half_order] * converter->filter_coef[half_order];
