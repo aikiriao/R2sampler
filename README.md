@@ -31,6 +31,14 @@ Example command for resampling input Wav to 48000 Hz.
 ./rsampler -r 48000 INPUT.wav OUTPUT.wav
 ```
 
-## License
+# TODO
+
+- [ ] Implement other filter design algorithms
+
+  - [ ] Custom allocator API
+  - [ ] Least square method
+  - [ ] Remez exchange method
+
+# License
 
 MIT
