@@ -35,9 +35,9 @@ Example command for resampling input Wav to 48000 Hz.
 
 - [ ] Implement other filter design algorithms
 
-  - [ ] Custom allocator API
-  - [ ] Least square method
-  - [ ] Remez exchange method
+    - [ ] Custom allocator API
+    - [ ] Least square method
+    - [ ] Remez exchange method
 
 # License
 
